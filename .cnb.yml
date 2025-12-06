@@ -29,11 +29,12 @@ main:
       artifacts:
         - packages/lightrans/build/lightrans_chrome.zip
         - packages/lightrans/build/lightrans_firefox.zip
+    - name: 发布到 Release
       publish:
         - type: release
           name: Lightrans Release
           description: "Lightrans 浏览器扩展发布"
-          version: "auto"
+          version: "v0.0.1"
           artifacts:
             - packages/lightrans/build/lightrans_chrome.zip
             - packages/lightrans/build/lightrans_firefox.zip
