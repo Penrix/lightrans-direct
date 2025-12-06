@@ -86,7 +86,7 @@ function setProductEnvironment(done) {
  */
 function clean() {
     let output_dir = `./build/${browser}/`;
-    let packageName = `edge_translate_${browser}.zip`;
+    let packageName = `lightrans_${browser}.zip`;
     return del([output_dir, `./build/${packageName}`]);
 }
 
@@ -95,7 +95,7 @@ function clean() {
  */
 function packToZip() {
     let match_dir = `./build/${browser}/**/*`;
-    let packageName = `edge_translate_${browser}.zip`;
+    let packageName = `lightrans_${browser}.zip`;
     return gulp.src(match_dir).pipe(zip(packageName)).pipe(gulp.dest("./build/"));
 }
 

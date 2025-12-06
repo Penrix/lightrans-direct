@@ -27,14 +27,13 @@ main:
           script: |
             ls -la packages/lightrans/build/
       artifacts:
-        - path: packages/lightrans/build/chrome.zip
-          name: chrome-extension
-          type: zip
-        - path: packages/lightrans/build/firefox.zip
-          name: firefox-extension
-          type: zip
+        - packages/lightrans/build/lightrans_chrome.zip
+        - packages/lightrans/build/lightrans_firefox.zip
       publish:
         - type: release
           name: Lightrans Release
           description: "Lightrans 浏览器扩展发布"
           version: "auto"
+          artifacts:
+            - packages/lightrans/build/lightrans_chrome.zip
+            - packages/lightrans/build/lightrans_firefox.zip
