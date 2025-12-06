@@ -8,17 +8,19 @@ main:
       imports:
         - https://cnb.cool/hin/env/-/blob/main/lightrans.yml
       stages:
-        - name: 安装依赖
+        - name: 安装根目录依赖
           script: |
             npm install
-        - name: 构建 translators 包
+        - name: 安装 translators 包依赖并构建
           script: |
             cd packages/translators
+            npm install
             npm run build
             cd ../..
-        - name: 构建 lightrans 包
+        - name: 安装 lightrans 包依赖并构建
           script: |
             cd packages/lightrans
+            npm install
             npm run build
             cd ../..
         - name: 检查构建产物
