@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<html>
+    <head>
+        <link type="text/css" rel="stylesheet" href="./popup.css" />
+    </head>
+
+    <body>
+        <div class="frame">
+            <div class="row">
+                <input type="text" id="translate_input" autofocus="autofocus" />
+                <button id="translateSubmit" class="i18n" data-i18n-name="Translate"></button>
+            </div>
+            <label
+                id="hint_message"
+                class="i18n"
+                for="translate_input"
+                data-i18n-name="InputHint"
+            ></label>
+            <!-- 移除了谷歌网页翻译链接，现在使用统一的翻译引擎 -->
+            <div id="setting" style="display: block;">
+            <div class="row" style="align-items: flex-end">
+                <div class="col">
+                    <div class="selection">
+                        <select id="sl">
+                            <option
+                                class="i18n"
+                                value="auto"
+                                data-i18n-name="AutoDetect"
+                            ></option>
+                        </select>
+                    </div>
+                </div>
+                <i
+                    class="translate-icon translate-icon-exchange"
+                    id="exchange"
+                    title="交换两种语言"
+                ></i>
+                <div class="col">
+                    <div class="selection">
+                        <select id="tl"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div id="result" class="result-container">
+            <div id="translated-text"></div>
+        </div>
+
+        <footer>
+            ©2025
+            <a href="https://hin.cool" target="blank">
+                lightrans
+            </a>
+        </footer>
+    </body>
+
+    <script src="./popup.js"></script>
+</html>

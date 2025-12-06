@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title class="i18n" data-i18n-name="SettingsTitle"></title>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <link type="text/css" rel="stylesheet" href="./options.css" />
+    </head>
+
+    <body>
+        <div id="option">
+            <header>
+            <img src="../icon/icon128.png" />
+            <span class="space"></span>
+            <span class="space"></span>
+            轻量翻译
+        </header>
+            <div class="content">
+                <label class="setting-title i18n" data-i18n-name="AIModel"></label>
+                <div class="row">
+                    <div class="column">
+                        <label
+                            for="ai-model"
+                            class="checked-label i18n"
+                            data-i18n-name="AIModel"
+                            data-insert-pos="afterBegin"
+                        >
+                            <select
+                                id="ai-model"
+                                setting-type="select"
+                                setting-path="AIModel"
+                                class="translator-config"
+                            ></select>
+                        </label>
+                    </div>
+                </div>
+
+
+
+                <label
+                    for="layout-settings"
+                    class="setting-title i18n"
+                    data-i18n-name="LayoutSettings"
+                ></label>
+                <div id="layout-settings">
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                value="resize"
+                                setting-type="switch"
+                                setting-path="LayoutSettings Resize"
+                                class="switch"
+                                id="Resize"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="Resize"
+                                class="checked-label i18n"
+                                data-i18n-name="ResizeSetting"
+                            ></label>
+                        </div>
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                value="rtl"
+                                setting-type="switch"
+                                setting-path="LayoutSettings RTL"
+                                class="switch"
+                                id="RTL"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="RTL"
+                                class="checked-label i18n"
+                                data-i18n-name="RTLSetting"
+                            ></label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                value="FoldLongContent"
+                                setting-type="switch"
+                                setting-path="LayoutSettings FoldLongContent"
+                                class="switch"
+                                id="FoldLongContent"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="FoldLongContent"
+                                class="checked-label i18n"
+                                data-i18n-name="FoldLongContentSetting"
+                            ></label>
+                        </div>
+                        <div class="column">
+                            <label
+                                for="select-translate-position"
+                                class="checked-label i18n"
+                                data-i18n-name="SelectTranslatePosition"
+                                data-insert-pos="afterBegin"
+                            >
+                                <select
+                                    setting-type="select"
+                                    id="select-translate-position"
+                                    value="SelectTranslatePosition"
+                                    setting-path="LayoutSettings SelectTranslatePosition"
+                                >
+                                    <option
+                                        value="TopRight"
+                                        data-i18n-name="TopRight"
+                                        class="i18n"
+                                    ></option>
+                                    <option
+                                        value="TopLeft"
+                                        data-i18n-name="TopLeft"
+                                        class="i18n"
+                                    ></option>
+                                    <option
+                                        value="BottomRight"
+                                        data-i18n-name="BottomRight"
+                                        class="i18n"
+                                    ></option>
+                                    <option
+                                        value="BottomLeft"
+                                        data-i18n-name="BottomLeft"
+                                        class="i18n"
+                                    ></option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <label
+                    for="other-settings"
+                    class="setting-title i18n"
+                    data-i18n-name="OtherSettings"
+                ></label>
+                <div id="other-settings">
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="OtherSettings SelectTranslate"
+                                class="switch"
+                                id="select-translate"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="select-translate"
+                                class="checked-label i18n"
+                                data-i18n-name="SelectTranslate"
+                            ></label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="OtherSettings UsePDFjs"
+                                class="switch"
+                                id="use-pdf-js"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="use-pdf-js"
+                                class="checked-label i18n"
+                                data-i18n-name="UsePDFjs"
+                            ></label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="OtherSettings TranslateAfterSelect"
+                                class="switch"
+                                id="translate-after-select"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="translate-after-select"
+                                class="checked-label i18n"
+                                data-i18n-name="TranslateAfterSelect"
+                            ></label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="OtherSettings TranslateAfterDblClick"
+                                class="switch"
+                                id="translate-after-dbl-click"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="translate-after-dbl-click"
+                                class="checked-label i18n"
+                                data-i18n-name="TranslateAfterDblClick"
+                            ></label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="OtherSettings CancelTextSelection"
+                                class="switch"
+                                id="cancel-text-selection"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="cancel-text-selection"
+                                class="checked-label i18n"
+                                data-i18n-name="CancelTextSelection"
+                            ></label>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <footer>
+                ©2025
+                <a href="https://hin.cool" target="blank">
+                    lightrans
+                </a>
+                <span class="space"></span>
+                Powered by
+                <a href="https://hin.cool" target="blank"> W4J1e </a>
+            </footer>
+        </div>
+    </body>
+
+    <script src="./options.js"></script>
+</html>
