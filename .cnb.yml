@@ -29,12 +29,19 @@ main:
       artifacts:
         - packages/lightrans/build/lightrans_chrome.zip
         - packages/lightrans/build/lightrans_firefox.zip
+
     - name: 发布到 Release
-      publish:
-        - type: release
-          name: Lightrans Release
-          description: "Lightrans 浏览器扩展发布"
-          version: "v0.0.1"
-          artifacts:
-            - packages/lightrans/build/lightrans_chrome.zip
-            - packages/lightrans/build/lightrans_firefox.zip
+      needs: ["构建 Lightrans 扩展"]
+      stages:
+        - name: 创建 Release
+          type: git:release
+          options:
+            tag: v0.0.1
+            title: "first_version"
+            description: "第一个版本"
+        - name: 上传构建产物
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - "./packages/lightrans/build/lightrans_chrome.zip"
+              - "./packages/lightrans/build/lightrans_firefox.zip"
