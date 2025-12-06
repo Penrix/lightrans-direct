@@ -1,0 +1,12 @@
+**/build/
+**/dist/
+**/node_modules/
+**/publish/
+**/*.zip
+**/*.crx
+**/*.pem
+**/npm-debug.log
+**/.DS_Store
+**/.idea
+**/*.log
+**/*.local

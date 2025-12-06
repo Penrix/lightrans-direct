@@ -1,0 +1,19 @@
+{
+    "private": true,
+    "description": "A translator extension.",
+    "keywords": [
+        "lightrans",
+        "轻量翻译"
+    ],
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/W4J1e/Lightrans"
+    },
+    "scripts": {
+    "build": "npm run build --workspace=lightrans"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}
