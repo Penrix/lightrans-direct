@@ -1,16 +1,32 @@
 const path = require("path");
 const webpack = require("webpack");
 
-// Load environment variables from root directory .env.local file
+// Load environment variables from root directory .env.local file using Node.js built-in fs module
 let env = {};
 try {
-  const dotenv = require("dotenv");
-  env = dotenv.config({
-    path: path.resolve(__dirname, "../../.env.local")
-  }).parsed || {};
+  const fs = require('fs');
+  const envPath = path.resolve(__dirname, "../../../.env.local");
+  console.log(`Attempting to read env file from: ${envPath}`);
+  
+  // Read .env.local file content
+  const envFileContent = fs.readFileSync(envPath, 'utf8');
+  
+  // Parse environment variables
+  envFileContent.split('\n').forEach(line => {
+    // Ignore empty lines and comments
+    if (line.trim() && !line.startsWith('#')) {
+      // Split key-value pairs
+      const [key, value] = line.split('=').map(part => part.trim());
+      if (key && value) {
+        env[key] = value;
+      }
+    }
+  });
+  
+  console.log(`Successfully loaded ${Object.keys(env).length} environment variables from ${envPath}`);
 } catch (error) {
-  // If dotenv is not available, continue with empty environment variables
-  console.log("dotenv not found, using empty environment variables");
+  console.log(`Error reading env file: ${error.message}`);
+  console.log('Using empty environment variables');
 }
 
 // Convert environment variables for webpack DefinePlugin

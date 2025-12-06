@@ -11,7 +11,7 @@
         "url": "https://github.com/W4J1e/Lightrans"
     },
     "scripts": {
-    "build": "cd packages/lightrans && npm run build"
+    "build": "cd packages/translators && npm run build && cd ../lightrans && npm run build"
   }
 
 }
