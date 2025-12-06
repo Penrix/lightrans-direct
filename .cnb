@@ -1,0 +1,31 @@
+main:
+  push:
+    - docker:
+        image: node:16
+        volumes:
+          - /root/.npm:copy-on-write
+      stages:
+        - name: 安装依赖
+          script: |
+            npm install
+        - name: 构建 translators 包
+          script: |
+            cd packages/translators
+            npm run build
+            cd ../..
+        - name: 构建 lightrans 包
+          script: |
+            cd packages/lightrans
+            npm run build
+            cd ../..
+      artifacts:
+        - packages/lightrans/build/chrome.zip
+        - packages/lightrans/build/firefox.zip
+    - name: 发布到 release
+      uses: cnbcool/release@v1
+      with:
+        files:
+          - packages/lightrans/build/chrome.zip
+          - packages/lightrans/build/firefox.zip
+        tag: v${{ env.VERSION }}
+        message: "Lightrans ${{ env.VERSION }} 
