@@ -26,10 +26,12 @@ main:
         - name: 检查构建产物
           script: |
             ls -la packages/lightrans/build/
-        - name: 上传附件到Release
-          image: cnbcool/attachments:latest
-          settings:
-            type: UPLOAD
-            attachments:
+        - name: 发布 Release
+          type: git:release
+          options:
+            tag: nightly
+            title: "Lightrans Nightly Build"
+            description: "自动构建的每日版本"
+            assets:
               - packages/lightrans/build/lightrans_chrome.zip
               - packages/lightrans/build/lightrans_firefox.zip
