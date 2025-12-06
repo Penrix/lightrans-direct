@@ -10,17 +10,17 @@ main:
       stages:
         - name: 安装根目录依赖
           script: |
-            npm install
+            npm install --legacy-peer-deps
         - name: 安装 translators 包依赖并构建
           script: |
             cd packages/translators
-            npm install
+            npm install --legacy-peer-deps
             npm run build
             cd ../..
         - name: 安装 lightrans 包依赖并构建
           script: |
             cd packages/lightrans
-            npm install
+            npm install --legacy-peer-deps
             npm run build
             cd ../..
         - name: 检查构建产物
