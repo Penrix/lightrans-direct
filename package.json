@@ -11,9 +11,7 @@
         "url": "https://github.com/W4J1e/Lightrans"
     },
     "scripts": {
-    "build": "npm run build --workspace=lightrans"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+    "build": "cd packages/lightrans && npm run build"
+  }
+
 }
