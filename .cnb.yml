@@ -1,37 +1,57 @@
+$: 
+  image: node:22  
+  stages:  
+    - name: 安装根目录依赖
+      script: npm install --legacy-peer-deps
+    - name: 安装translators包依赖并构建
+      script: |
+        cd packages/translators
+        npm install --legacy-peer-deps
+        npm run build
+        cd ../..
+    - name: 安装lightrans包依赖并构建
+      script: |
+        cd packages/lightrans
+        npm install --legacy-peer-deps
+        npm run build
+        cd ../..
+    - name: 检查构建产物
+      script: ls -la packages/lightrans/build/
+
 main:
-  push:
+  push:  
     - name: 构建并发布 Lightrans 扩展
-      docker:
+      docker:  
         image: node:22
         volumes:
           - /root/.npm:copy-on-write
       imports:
         - https://cnb.cool/hin/env/-/blob/main/lightrans.yml
-      stages:
-        - name: 安装根目录依赖
-          script: |
-            npm install --legacy-peer-deps
-        - name: 安装translators包依赖并构建
-          script: |
-            cd packages/translators
-            npm install --legacy-peer-deps
-            npm run build
-            cd ../..
-        - name: 安装lightrans包依赖并构建
-          script: |
-            cd packages/lightrans
-            npm install --legacy-peer-deps
-            npm run build
-            cd ../..
-        - name: 检查构建产物
-          script: |
-            ls -la packages/lightrans/build/
-        - name: 发布 Release
-          type: git:release
-          options:
-            tag: nightly
-            title: "Lightrans Nightly Build"
-            description: "自动构建的每日版本"
-            assets:
-              - packages/lightrans/build/lightrans_chrome.zip
-              - packages/lightrans/build/lightrans_firefox.zip
+
+  tag_push:
+    stages:  
+      - name: 安装根目录依赖
+        script: npm install --legacy-peer-deps
+      - name: 安装translators包依赖并构建
+        script: |
+          cd packages/translators
+          npm install --legacy-peer-deps
+          npm run build
+          cd ../..
+      - name: 安装lightrans包依赖并构建
+        script: |
+          cd packages/lightrans
+          npm install --legacy-peer-deps
+          npm run build
+          cd ../..
+      - name: 检查构建产物
+        script: ls -la packages/lightrans/build/
+      - name: 发布 Release  
+        type: git:release
+        options:
+          tag: nightly
+          title: "Lightrans Nightly Build"
+          description: "自动构建的每日版本"
+          assets:  
+            - packages/lightrans/build/lightrans_chrome.zip
+            - packages/lightrans/build/lightrans_firefox.zip
