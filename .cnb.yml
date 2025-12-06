@@ -26,8 +26,6 @@ main:
         - name: 检查构建产物
           script: |
             ls -la packages/lightrans/build/
-    - name: 上传构建产物到Release
-      stages:
         - name: 上传附件到Release
           image: cnbcool/attachments:latest
           settings:
