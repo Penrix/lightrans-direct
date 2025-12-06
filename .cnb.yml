@@ -1,5 +1,41 @@
 main:
   push:
+    - name: 构建 Lightrans 扩展
+      docker:
+        image: node:22
+        volumes:
+          - /root/.npm:copy-on-write
+      imports:
+        - https://cnb.cool/hin/env/-/blob/main/lightrans.yml
+      stages:
+        - name: 安装依赖
+          script: |
+            npm install
+        - name: 构建 translators 包
+          script: |
+            cd packages/translators
+            npm run build
+            cd ../..
+        - name: 构建 lightrans 包
+          script: |
+            cd packages/lightrans
+            npm run build
+            cd ../..
+        - name: 检查构建产物
+          script: |
+            ls -la packages/lightrans/build/
+      artifacts:
+        - path: packages/lightrans/build/chrome.zip
+          name: chrome-extension
+          type: zip
+        - path: packages/lightrans/build/firefox.zip
+          name: firefox-extension
+          type: zip
+      publish:
+        - type: release
+          name: Lightrans Release
+          description: "Lightrans 浏览器扩展发布"
+          version: "auto"
     - name: 同步 Github 仓库
       stages:
         - name: 同步 Github 仓库
@@ -7,5 +43,4 @@ main:
             - https://cnb.cool/hin/env/-/blob/main/cnb2github.yml
           script: |
             git remote add github https://x-access-token:$GITHUB_TOKEN@github.com/W4J1e/Lightrans
-            git push github main --force              
-         
+            git push github main --force
