@@ -1,5 +1,5 @@
 const fs = require("fs");
-import { LANGUAGES } from "@edge_translate/translators";
+import { LANGUAGES } from "@lightrans/translators";
 import { BROWSER_LANGUAGES_MAP } from "common/scripts/languages.js";
 
 describe("All languages supported by Google web page translate should be in BROWSER_LANGUAGES_MAP.", () => {

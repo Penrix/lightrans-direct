@@ -1,4 +1,4 @@
-import { LANGUAGES } from "@edge_translate/translators";
+import { LANGUAGES } from "@lightrans/translators";
 import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";

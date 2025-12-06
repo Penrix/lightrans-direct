@@ -1,4 +1,4 @@
-import { AITranslator } from "@edge_translate/translators";
+import { AITranslator } from "@lightrans/translators";
 import { log } from "common/scripts/common.js";
 import { promiseTabs, delayPromise } from "common/scripts/promise.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
