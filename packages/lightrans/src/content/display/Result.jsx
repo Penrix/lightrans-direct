@@ -485,6 +485,8 @@ export const Block = styled.div`
     /* box-shadow: 0px 3px 6px rgba(127, 127, 127, 0.25); */
     line-height: 120%;
     letter-spacing: 0.02em;
+    min-height: auto;
+    max-height: none;
 `;
 
 const Source = styled(Block)`

@@ -44,6 +44,8 @@ export default function DrawerBlock(props) {
                     if (fold) return props.DrawerHeight;
                     return originalHeight + HandleExpandHeight;
                 }
+                // When not using drawer, let the content fit naturally
+                return 'auto';
             })()}
         >
             <Content ref={contentElRef}>{props.children}</Content>
@@ -69,7 +71,7 @@ const Drawer = styled.div`
     overflow: hidden;
     position: relative;
     transition: height 0.4s;
-    ${(props) => (props.height ? `height: ${props.height}px` : "")}
+    ${(props) => (props.height ? `height: ${props.height}` : "")}
 `;
 const Content = styled.div``;
 /**

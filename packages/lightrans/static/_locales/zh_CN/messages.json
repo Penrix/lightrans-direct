@@ -5,7 +5,7 @@
     },
     "Description": {
         "message": "轻量翻译",
-        "description": "应用描述"
+        "description": "这是一个轻量翻译插件"
     },
     "ChangeLanguageSetting": {
         "message": "更改语言设置",

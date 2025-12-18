@@ -721,7 +721,7 @@ const GlobalStyle = createGlobalStyle`
     /* Fix content disappearing problem. */
     [data-simplebar] {
         width: 100%;
-        height: 100%;
+        height: auto;
         max-height: 100%;
     }
 
@@ -767,6 +767,18 @@ const GlobalStyle = createGlobalStyle`
         flex-direction: column;
         justify-content: flex-start;
         align-items: center;
+        height: auto;
+    }
+
+    /* Ensure the simplebar wrapper only takes the height of its content */
+    .simplebar-wrapper {
+        height: auto !important;
+        max-height: 100%;
+    }
+
+    /* Ensure the simplebar-mask only takes the height of its content */
+    .simplebar-mask {
+        height: auto !important;
     }
 `;
 

@@ -56,7 +56,6 @@
         "copy_result": {
             "description": "__MSG_CopyResult__"
         },
-        
         "translate_page": {
             "description": "__MSG_TranslatePage__"
         },

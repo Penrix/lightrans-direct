@@ -266,19 +266,33 @@ function packStatic() {
  */
 function merge_json(...args) {
     let objs = [];
-    for (let i in args) {
-        objs.push(JSON.parse(fs.readFileSync(args[i])));
+    try {
+        for (let i in args) {
+            const content = fs.readFileSync(args[i], 'utf8');
+            objs.push(JSON.parse(content));
+        }
+    } catch (error) {
+        console.error('Error reading or parsing manifest files:', error);
+        throw error;
     }
 
     let stream = through.obj(function (file, enc, callback) {
-        let obj = JSON.parse(file.contents.toString(enc));
-        for (let i in objs) {
-            obj = _.defaultsDeep(obj, objs[i]);
-        }
+        try {
+            const content = file.contents.toString(enc);
+            let obj = JSON.parse(content);
+            for (let i in objs) {
+                obj = _.defaultsDeep(obj, objs[i]);
+            }
 
-        file.contents = Buffer.from(JSON.stringify(obj));
-        this.push(file);
-        callback();
+            // Use JSON.stringify with proper formatting to avoid truncation issues
+            const jsonString = JSON.stringify(obj, null, 2);
+            file.contents = Buffer.from(jsonString, 'utf8');
+            this.push(file);
+            callback();
+        } catch (error) {
+            console.error('Error processing manifest file:', error);
+            callback(error);
+        }
     });
 
     return stream;
