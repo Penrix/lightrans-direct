@@ -16,15 +16,16 @@ class AITranslator {
      * Available translation models.
      */
     private availableModels: string[] = [
+        "Qwen/Qwen3-8B",
         "tencent/Hunyuan-MT-7B",
-        "Qwen/Qwen2.5-7B-Instruct",
-        "THUDM/glm-4-9b-chat"
+        "THUDM/glm-4-9b-chat",
+        "Qwen/Qwen2.5-7B-Instruct"
     ];
     
     /**
      * Current model to use.
      */
-    private currentModel: string = "tencent/Hunyuan-MT-7B";
+    private currentModel: string = "Qwen/Qwen3-8B";
 
     /**
      * Detect language of given text.
@@ -68,7 +69,9 @@ class AITranslator {
                     }
                 ],
                 temperature: 0.3,
-                max_tokens: 1024
+                max_tokens: 1024,
+                // Disable thinking mode for Qwen/Qwen3-8B model
+                enable_thinking: this.currentModel === "Qwen/Qwen3-8B" ? false : undefined
             };
 
             // Send the request

@@ -10,13 +10,8 @@ import { checkTimestamp } from "./Panel.jsx";
 import DrawerBlock from "./DrawerBlock.jsx";
 import EditIcon from "./icons/edit.svg";
 import EditDoneIcon from "./icons/edit-done.svg";
-import PronounceIcon from "./icons/pronounce.svg";
-import PronounceLoadingIcon from "./icons/loading.jsx";
 import CopyIcon from "./icons/copy.svg";
 
-// TTS speeds
-let sourceTTSSpeed = "fast",
-    targetTTSSpeed = "fast";
 // Communication channel.
 const channel = new Channel();
 const notifier = new Notifier("center");
@@ -55,10 +50,6 @@ export default function Result(props) {
     /**
      * The visible state of contents.
      */
-    const [displayTPronunciation, setDisplayTPronunciation] = useState(false);
-    const [displaySPronunciation, setDisplaySPronunciation] = useState(false);
-    const [displayTPronunciationIcon, setDisplayTPronunciationIcon] = useState(false);
-    const [displaySPronunciationIcon, setDisplaySPronunciationIcon] = useState(false);
     const [contentFilter, setContentFilter] = useState({});
 
     /**
@@ -70,12 +61,6 @@ export default function Result(props) {
      * Whether to fold too long translation content.
      */
     const [foldLongContent, setFoldLongContent] = useState(true);
-
-    /**
-     * The pronounce status
-     */
-    const [sourcePronouncing, setSourcePronounce] = useReducer(sourcePronounce, false),
-        [targetPronouncing, setTargetPronounce] = useReducer(targetPronounce, false);
 
     // Indicate whether user can edit and copy the translation result
     const [copyResult, setCopyResult] = useReducer(copyContent, false);
@@ -110,28 +95,6 @@ export default function Result(props) {
                             title={chrome.i18n.getMessage("CopyResult")}
                         />
                     </TextLine>
-                    {(displayTPronunciationIcon || displayTPronunciation) && (
-                        <PronounceLine>
-                            {displayTPronunciationIcon &&
-                                (targetPronouncing ? (
-                                    <StyledPronounceLoadingIcon />
-                                ) : (
-                                    <StyledPronounceIcon
-                                        role="button"
-                                        onClick={() => setTargetPronounce(true)}
-                                    />
-                                ))}
-                            {displayTPronunciation && (
-                                <PronounceText
-                                    dir={textDirection}
-                                    DrawerHeight={TextContentDrawerHeight}
-                                    DisableDrawer={!foldLongContent}
-                                >
-                                    {props.tPronunciation}
-                                </PronounceText>
-                            )}
-                        </PronounceLine>
-                    )}
                 </Target>
             )}
         </Fragment>
@@ -174,28 +137,6 @@ export default function Result(props) {
                             />
                         )}
                     </TextLine>
-                    {(displaySPronunciationIcon || displaySPronunciation) && (
-                        <PronounceLine>
-                            {displaySPronunciationIcon &&
-                                (sourcePronouncing ? (
-                                    <StyledPronounceLoadingIcon />
-                                ) : (
-                                    <StyledPronounceIcon
-                                        role="button"
-                                        onClick={() => setSourcePronounce(true)}
-                                    />
-                                ))}
-                            {displaySPronunciation && (
-                                <PronounceText
-                                    dir={textDirection}
-                                    DrawerHeight={TextContentDrawerHeight}
-                                    DisableDrawer={!foldLongContent}
-                                >
-                                    {props.sPronunciation}
-                                </PronounceText>
-                            )}
-                        </PronounceLine>
-                    )}
                 </Source>
             )}
         </Fragment>
@@ -350,45 +291,13 @@ export default function Result(props) {
     };
 
     useEffect(() => {
-        sourceTTSSpeed = "fast";
-        targetTTSSpeed = "fast";
-
         /*
          * COMMUNICATE WITH BACKGROUND MODULE
          */
         const cancelers = [];
         cancelers.push(
-            channel.on("pronouncing_finished", (detail) => {
-                if (checkTimestamp(detail.timestamp)) {
-                    if (detail.pronouncing === "source") setSourcePronounce(false);
-                    else if (detail.pronouncing === "target") setTargetPronounce(false);
-                }
-            })
-        );
-
-        cancelers.push(
-            channel.on("pronouncing_error", (detail) => {
-                if (checkTimestamp(detail.timestamp)) {
-                    if (detail.pronouncing === "source") setSourcePronounce(false);
-                    else if (detail.pronouncing === "target") setTargetPronounce(false);
-                    notifier.notify({
-                        type: "error",
-                        title: chrome.i18n.getMessage("AppName"),
-                        detail: chrome.i18n.getMessage("PRONOUN_ERR"),
-                    });
-                }
-            })
-        );
-
-        cancelers.push(
             channel.on("command", (detail) => {
                 switch (detail.command) {
-                    case "pronounce_original":
-                        setSourcePronounce(true);
-                        break;
-                    case "pronounce_translated":
-                        setTargetPronounce(true);
-                        break;
                     case "copy_result":
                         if (window.translateResult?.mainMeaning && translateResultElRef.current) {
                             setCopyResult({ copy: true, element: translateResultElRef.current });
@@ -411,19 +320,10 @@ export default function Result(props) {
             setContentFilter({
                 mainMeaning: true,
                 originalText: true,
-                tPronunciation: true,
-                sPronunciation: true,
-                tPronunciationIcon: true,
-                sPronunciationIcon: true,
                 detailedMeanings: true,
                 definitions: true,
                 examples: true
             });
-            // Set default display values
-            setDisplaySPronunciation(true);
-            setDisplayTPronunciation(true);
-            setDisplaySPronunciationIcon(true);
-            setDisplayTPronunciationIcon(true);
             // Set default content display order
             setContentDisplayOrder(["mainMeaning", "originalText", "detailedMeanings", "definitions", "examples"]);
             // Set layout settings
@@ -536,19 +436,6 @@ const StyledEditDoneIcon = styled(EditDoneIcon)`
     }
 `;
 
-const PronounceLine = styled.div`
-    width: 100%;
-    margin: 5px 0;
-    display: flex;
-    flex-direction: ${(props) => (props.theme.textDirection === "ltr" ? "row" : "row-reverse")};
-    justify-content: flex-start;
-    align-items: center;
-`;
-
-const PronounceText = styled(DrawerBlock)`
-    color: ${Gray};
-`;
-
 const StyledCopyIcon = styled(CopyIcon)`
     width: 20px;
     height: 20px;
@@ -558,43 +445,6 @@ const StyledCopyIcon = styled(CopyIcon)`
     transition: fill 0.2s linear;
     &:hover {
         fill: dimgray;
-    }
-`;
-
-const StyledPronounceIcon = styled(PronounceIcon)`
-    width: 20px;
-    height: 20px;
-    padding: 2px;
-    margin-right: 10px;
-    fill: ${LightPrimary};
-    flex-shrink: 0;
-    transition: fill 0.2s linear;
-    ${(props) =>
-        props.theme.textDirection === "ltr"
-            ? `
-                margin-right: 10px;
-            `
-            : `
-                margin-left: 10px;
-                transform: rotate(180deg);
-            `}
-
-    &:hover {
-        fill: orange !important;
-    }
-`;
-
-const StyledPronounceLoadingIcon = styled(PronounceLoadingIcon)`
-    width: 24px;
-    height: 24px;
-    margin-right: 10px;
-    fill: ${LightPrimary};
-    padding: 0;
-    flex-shrink: 0;
-
-    circle {
-        fill: none;
-        stroke: ${LightPrimary} !important;
     }
 `;
 
@@ -725,50 +575,7 @@ const ExampleTarget = styled.div`
  * STYLE FOR THE COMPONENT END
  */
 
-/**
- * A reducer for source pronouncing state
- * Send message to background to pronounce the translating text.
- */
-function sourcePronounce(_, startPronounce) {
-    if (startPronounce)
-        channel
-            .request("pronounce", {
-                pronouncing: "source",
-                text: window.translateResult.originalText,
-                language: window.translateResult.sourceLanguage,
-                speed: sourceTTSSpeed,
-            })
-            .then(() => {
-                if (sourceTTSSpeed === "fast") {
-                    sourceTTSSpeed = "slow";
-                } else {
-                    sourceTTSSpeed = "fast";
-                }
-            });
-    return startPronounce;
-}
 
-/**
- * A reducer for target pronouncing state
- */
-function targetPronounce(_, startPronounce) {
-    if (startPronounce)
-        channel
-            .request("pronounce", {
-                pronouncing: "target",
-                text: window.translateResult.mainMeaning,
-                language: window.translateResult.targetLanguage,
-                speed: targetTTSSpeed,
-            })
-            .then(() => {
-                if (targetTTSSpeed === "fast") {
-                    targetTTSSpeed = "slow";
-                } else {
-                    targetTTSSpeed = "fast";
-                }
-            });
-    return startPronounce;
-}
 
 /**
  * A reducer for copying state of translation result
