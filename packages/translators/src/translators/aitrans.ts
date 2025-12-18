@@ -30,13 +30,21 @@ class AITranslator {
     /**
      * Detect language of given text.
      * 
-     * @param _text text to detect
+     * @param text text to detect
      * 
      * @returns Promise of detected language
      */
-    async detect(_text: string): Promise<string> {
-        // SiliconFlow API doesn't provide language detection directly, so we'll use a simple heuristic
-        // or always return "auto" since the translation API supports auto-detection
+    async detect(text: string): Promise<string> {
+        // Simple heuristic to detect Chinese/English
+        // Check if text contains Chinese characters
+        if (/[\u4e00-\u9fa5]/.test(text)) {
+            return "zh-CN";
+        } 
+        // Check if text contains mostly English characters
+        else if (/^[a-zA-Z0-9\s\p{Punctuation}]*$/u.test(text)) {
+            return "en";
+        }
+        // For other languages, return auto
         return "auto";
     }
 

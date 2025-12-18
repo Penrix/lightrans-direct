@@ -31,6 +31,9 @@ class TranslatorManager {
 
             // Translation language settings.
             this.LANGUAGE_SETTING = configs.languageSetting;
+            
+            // Other settings.
+            this.OTHER_SETTINGS = configs.OtherSettings;
 
             // The default translator to use.
             this.DEFAULT_TRANSLATOR = "AITrans";
@@ -73,8 +76,36 @@ class TranslatorManager {
             // Ensure that configurations have been initialized.
             await this.config_loader;
             
-            const { text, sl, tl } = params;
+            let { text, sl, tl } = params;
+            
             try {
+                // 处理互译模式
+                if (this.OTHER_SETTINGS.MutualTranslate) {
+                    // 如果源语言是自动检测，先检测语言
+                    if (sl === "auto") {
+                        sl = await this.AI_TRANSLATOR.detect(text);
+                        console.log('Popup detected source language:', sl);
+                    }
+                    
+                    console.log('Popup current sl:', sl, 'current tl:', tl);
+                    console.log('Popup MutualTranslate:', this.OTHER_SETTINGS.MutualTranslate);
+                    
+                    // 互译模式：根据检测到的源语言动态切换目标语言
+                    if (sl === "zh-CN" || sl === "zh-TW") {
+                        // 如果源语言是中文，目标语言切换为英文
+                        tl = "en";
+                        console.log('Popup switching to English, tl:', tl);
+                    } else if (sl === "en") {
+                        // 如果源语言是英文，目标语言切换为中文
+                        tl = this.LANGUAGE_SETTING.tl;
+                        console.log('Popup switching to Chinese, tl:', tl);
+                    } else {
+                        // 其他语言保持原有目标语言
+                        console.log('Popup keeping original target language, tl:', tl);
+                    }
+                }
+                
+                console.log('Popup final translation languages - sl:', sl, 'tl:', tl);
                 let result = await this.AI_TRANSLATOR.translate(text, sl, tl);
                 return result;
             } catch (error) {
@@ -136,6 +167,10 @@ class TranslatorManager {
 
                     if (changes["languageSetting"]) {
                         this.LANGUAGE_SETTING = changes["languageSetting"].newValue;
+                    }
+                    
+                    if (changes["OtherSettings"]) {
+                        this.OTHER_SETTINGS = changes["OtherSettings"].newValue;
                     }
                     
                     if (changes["AIModel"]) {
@@ -263,9 +298,36 @@ class TranslatorManager {
 
         let sl = this.LANGUAGE_SETTING.sl,
             tl = this.LANGUAGE_SETTING.tl;
+        let originalTl = tl;
 
         try {
+            // 处理互译模式
+            if (this.OTHER_SETTINGS.MutualTranslate) {
+                // 如果源语言是自动检测，先检测语言
+                if (sl === "auto") {
+                    sl = await this.AI_TRANSLATOR.detect(text);
+                    console.log('Detected source language:', sl);
+                }
+                
+                console.log('Current sl:', sl, 'current tl:', tl);
+                console.log('MutualTranslate:', this.OTHER_SETTINGS.MutualTranslate);
+                
+                // 互译模式：根据检测到的源语言动态切换目标语言
+                if (sl === "zh-CN" || sl === "zh-TW") {
+                    // 如果源语言是中文，目标语言切换为英文
+                    tl = "en";
+                    console.log('Switching to English, tl:', tl);
+                } else if (sl === "en") {
+                    // 如果源语言是英文，目标语言切换为中文
+                    tl = this.LANGUAGE_SETTING.tl;
+                    console.log('Switching to Chinese, tl:', tl);
+                } else {
+                    // 其他语言保持原有目标语言
+                    console.log('Keeping original target language, tl:', tl);
+                }
+            }
 
+            console.log('Final translation languages - sl:', sl, 'tl:', tl);
             // Do translate.
             let result = await this.AI_TRANSLATOR.translate(text, sl, tl);
             result.sourceLanguage = sl;

@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS = {
     // Default settings of source language and target language
     languageSetting: { sl: "auto", tl: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()] },
     OtherSettings: {
-        MutualTranslate: false,
+        MutualTranslate: true,
         SelectTranslate: true,
         TranslateAfterDblClick: false,
         TranslateAfterSelect: false,
