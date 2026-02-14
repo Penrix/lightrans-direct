@@ -2,6 +2,8 @@
 
 一个轻量级且功能强大的翻译扩展，基于 EdgeTranslate 开发，为 Chrome 和 Firefox 浏览器提供无缝的翻译服务。
 
+Lightrans 网页版已上线，项目地址：[Lightrans_web](https://github.com/W4J1e/lightran_web) ,在线[demo](https://trans.hin.cool/)。
+
 ## 功能特性
 
 - **跨浏览器支持**：支持 Chrome 和 Firefox
