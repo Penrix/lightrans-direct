@@ -78,8 +78,8 @@ class AITranslator {
                 ],
                 temperature: 0.3,
                 max_tokens: 1024,
-                // Disable thinking mode for Qwen/Qwen3-8B model
-                enable_thinking: this.currentModel === "Qwen/Qwen3-8B" ? false : undefined
+                // Disable thinking mode for Qwen models
+                enable_thinking: this.currentModel.startsWith("Qwen/") ? false : undefined
             };
 
             // Send the request
