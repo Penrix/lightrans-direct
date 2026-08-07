@@ -16,9 +16,9 @@ class AITranslator {
      * Available translation models.
      */
     private availableModels: string[] = [
-        "Qwen/Qwen3.5-4B",
         "tencent/Hunyuan-MT-7B",
-        "THUDM/GLM-4-9B-0414"
+        "THUDM/GLM-4-9B-0414",
+        "Qwen/Qwen3.5-4B"
     ];
     
     /**

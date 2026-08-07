@@ -16,15 +16,15 @@
             轻量翻译
         </header>
             <div class="content">
-                <label class="setting-title i18n" data-i18n-name="AIModel"></label>
+                <label class="setting-title">基础设置</label>
                 <div class="row">
                     <div class="column">
                         <label
                             for="ai-model"
-                            class="checked-label i18n"
-                            data-i18n-name="AIModel"
-                            data-insert-pos="afterBegin"
+                            class="checked-label"
+                            style="justify-content: flex-start; gap: 8px;"
                         >
+                            翻译模型：
                             <select
                                 id="ai-model"
                                 setting-type="select"
@@ -33,9 +33,23 @@
                             ></select>
                         </label>
                     </div>
+                    <div class="column">
+                        <label
+                            class="checked-label"
+                            style="justify-content: flex-start; gap: 8px;"
+                        >
+                            页面翻译：
+                            <select
+                                setting-type="select"
+                                setting-path="PageTranslationDisplayMode"
+                            >
+                                <option value="original">仅原文</option>
+                                <option value="translated">仅译文</option>
+                                <option value="bilingual">对照（原文 + 译文）</option>
+                            </select>
+                        </label>
+                    </div>
                 </div>
-
-
 
                 <label
                     for="layout-settings"

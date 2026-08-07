@@ -544,8 +544,11 @@ class TranslatorManager {
  */
 function translatePage(channel, model) {
     console.log('lightrans: translatePage function called with model:', model);
-    // 获取当前标签页
-    promiseTabs.query({ active: true, currentWindow: true }).then((tabs) => {
+    // 读取页面翻译显示模式偏好（原文/译文/对照），决定整页翻译默认行为
+    getOrSetDefaultSettings().then((allSettings) => {
+        const pageModeParam = (allSettings && allSettings.PageTranslationDisplayMode) || "translated";
+        // 获取当前标签页
+        promiseTabs.query({ active: true, currentWindow: true }).then((tabs) => {
         const tabId = tabs[0].id;
         console.log('lightrans: Current tab id:', tabId);
         
@@ -555,10 +558,13 @@ function translatePage(channel, model) {
         // 使用chrome.tabs.executeScript注入脚本，避免模板字符串安全问题
         chrome.tabs.executeScript(tabId, {
             code: `
-                (function() {
-                    console.log('lightrans: Page translate script injected');
-                    
-                    // 检查document.body是否存在
+                    (function() {
+                        console.log('lightrans: Page translate script injected');
+
+                        // 页面翻译显示模式：original(原文) / translated(译文) / bilingual(对照)
+                        const pageMode = '${pageModeParam}';
+
+                        // 检查document.body是否存在
                     if (!document.body) {
                         console.error('lightrans: document.body is not available');
                         return;
@@ -566,6 +572,9 @@ function translatePage(channel, model) {
 
                     // 页面翻译工具条的标题元素引用（翻译完成时更新）
                     let bannerTitleEl = null;
+
+                    // 对照模式下插入的译文 span 集合，便于切换模式时移除
+                    const insertedSpans = [];
                     
                     // 存储原始文本内容，用于翻译和恢复
                     window.edgeTranslateOriginalTextNodes = [];
@@ -636,23 +645,24 @@ function translatePage(channel, model) {
                     // 替换已翻译的文本节点
                     function replaceTranslatedNodes() {
                         let replacedCount = 0;
-                        
+
                         // 替换所有已翻译的文本节点
                         textNodes.forEach((node, index) => {
                             const textIndex = textIndices[index];
                             if (textIndex >= 0 && translatedTexts[textIndex]) {
-                                // 只替换尚未替换的节点
-                                if (node.nodeValue !== translatedTexts[textIndex]) {
+                                // 始终缓存译文，供后续切换显示模式使用
+                                if (window.edgeTranslateOriginalTextNodes && window.edgeTranslateOriginalTextNodes[index]) {
+                                    window.edgeTranslateOriginalTextNodes[index].translatedText = translatedTexts[textIndex];
+                                }
+                                // 仅在「译文」模式下就地替换文本节点
+                                if (pageMode === 'translated' && node.nodeValue !== translatedTexts[textIndex]) {
                                     node.nodeValue = translatedTexts[textIndex];
-                                    if (window.edgeTranslateOriginalTextNodes && window.edgeTranslateOriginalTextNodes[index]) {
-                                        window.edgeTranslateOriginalTextNodes[index].translatedText = translatedTexts[textIndex];
-                                    }
                                     replacedCount++;
                                     totalReplaced++;
                                 }
                             }
                         });
-                        
+
                         if (replacedCount > 0) {
                             console.log('lightrans: Replaced', replacedCount, 'nodes in this update, total replaced:', totalReplaced);
                         }
@@ -676,6 +686,7 @@ function translatePage(channel, model) {
                         if (totalTranslated === allTexts.length) {
                             console.log('lightrans: All texts translated, total replaced:', totalReplaced, 'nodes');
                             if (bannerTitleEl) bannerTitleEl.textContent = 'Lightrans 已翻译此页';
+                            applyMode(pageMode);
                         }
                     }
                     
@@ -745,7 +756,48 @@ function translatePage(channel, model) {
                         }
                     }, 500);
 
-                    // 创建页面翻译工具条：显示原网页 / 显示译文 / 关闭
+                    // 根据显示模式渲染页面：原文 / 译文 / 对照
+                    function applyMode(mode) {
+                        const originals = window.edgeTranslateOriginalTextNodes || [];
+                        // 先清除已插入的对照译文 span
+                        insertedSpans.forEach((sp) => {
+                            if (sp.parentNode) sp.parentNode.removeChild(sp);
+                        });
+                        insertedSpans.length = 0;
+
+                        if (mode === 'bilingual') {
+                            originals.forEach((item) => {
+                                const node = item && item.node;
+                                if (!node) return;
+                                node.nodeValue = item.originalText;
+                                if (item.translatedText) {
+                                    const span = document.createElement('span');
+                                    span.className = 'lightrans-bilingual';
+                                    span.textContent = item.translatedText;
+                                    span.style.cssText = 'display:block;margin:2px 0 6px;padding:2px 6px;background:#f5f7fa;border-left:3px solid #2f6bff;color:#3a4252;font-size:0.92em;line-height:1.5;border-radius:4px;';
+                                    if (node.parentNode) {
+                                        node.parentNode.insertBefore(span, node.nextSibling);
+                                        insertedSpans.push(span);
+                                    }
+                                }
+                            });
+                        } else if (mode === 'original') {
+                            originals.forEach((item) => {
+                                if (item && item.node && item.originalText !== undefined) {
+                                    item.node.nodeValue = item.originalText;
+                                }
+                            });
+                        } else {
+                            // translated
+                            originals.forEach((item) => {
+                                if (item && item.node && item.translatedText) {
+                                    item.node.nodeValue = item.translatedText;
+                                }
+                            });
+                        }
+                    }
+
+                    // 创建页面翻译工具条：显示原网页 / 显示译文 / 对照 / 关闭
                     function createBanner() {
                         if (document.getElementById('lightrans-page-banner')) return;
                         const banner = document.createElement('div');
@@ -773,33 +825,29 @@ function translatePage(channel, model) {
 
                         const btnOriginal = makeBtn('显示原网页');
                         const btnTrans = makeBtn('显示译文');
+                        const btnBilingual = makeBtn('对照');
                         const btnClose = makeBtn('✕');
                         btnClose.style.cssText += 'font-size:15px;line-height:1;padding:3px 9px;';
 
                         banner.appendChild(btnOriginal);
                         banner.appendChild(btnTrans);
+                        banner.appendChild(btnBilingual);
                         banner.appendChild(btnClose);
                         document.body.appendChild(banner);
 
                         // 将页面主体下移，避免被工具条遮挡
                         document.body.style.marginTop = '40px';
 
-                        const originals = window.edgeTranslateOriginalTextNodes || [];
-
                         btnOriginal.addEventListener('click', () => {
-                            originals.forEach((item) => {
-                                if (item && item.node && item.originalText !== undefined) {
-                                    item.node.nodeValue = item.originalText;
-                                }
-                            });
+                            applyMode('original');
                         });
 
                         btnTrans.addEventListener('click', () => {
-                            originals.forEach((item) => {
-                                if (item && item.node && item.translatedText) {
-                                    item.node.nodeValue = item.translatedText;
-                                }
-                            });
+                            applyMode('translated');
+                        });
+
+                        btnBilingual.addEventListener('click', () => {
+                            applyMode('bilingual');
                         });
 
                         btnClose.addEventListener('click', () => {
@@ -824,6 +872,7 @@ function translatePage(channel, model) {
                 channel.emitToTabs(tabId, "start_page_translate", { translator: "aitrans", model: model });
             }
         });
+    });
     }).catch(error => {
         console.error('lightrans: Error in translatePage:', error);
     });

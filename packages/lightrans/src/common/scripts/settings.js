@@ -32,6 +32,8 @@ const DEFAULT_SETTINGS = {
     DefaultTranslator: "AITrans",
     AIModel: "tencent/Hunyuan-MT-7B",
     DefaultPageTranslator: "AITrans",
+    // Page translation display mode: "original" / "translated" / "bilingual"
+    PageTranslationDisplayMode: "translated",
     HybridTranslatorConfig: {
         // The translators used in current hybrid translate.
         translators: ["AITrans"],
