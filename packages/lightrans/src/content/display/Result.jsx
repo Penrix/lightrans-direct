@@ -363,7 +363,7 @@ export default function Result(props) {
 const BlockPadding = "10px";
 const BlockMargin = "8px";
 const LightPrimary = "rgba(74, 140, 247, 0.7)";
-const Gray = "#919191";
+const Gray = "#5f6368";
 const BlockContentDrawerHeight = 150; // drawer height for blocks
 const TextContentDrawerHeight = 50; // drawer height for texts
 
@@ -380,11 +380,12 @@ export const Block = styled.div`
     padding: ${BlockPadding};
     margin: ${BlockMargin};
     margin-top: 0;
-    background-color: rgb(250, 250, 250);
-    border-radius: 10px;
-    /* box-shadow: 0px 3px 6px rgba(127, 127, 127, 0.25); */
-    line-height: 120%;
-    letter-spacing: 0.02em;
+    background-color: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(31, 41, 55, 0.05);
+    line-height: 130%;
+    letter-spacing: 0.01em;
     min-height: auto;
     max-height: none;
 `;
@@ -392,11 +393,13 @@ export const Block = styled.div`
 const Source = styled(Block)`
     font-weight: normal;
     white-space: pre-wrap;
+    border-left: 3px solid rgba(0, 0, 0, 0.12);
 `;
 
 const Target = styled(Block)`
-    font-weight: normal;
+    font-weight: 500;
     white-space: pre-wrap;
+    border-left: 3px solid ${LightPrimary};
 `;
 
 const Detail = styled(Block)`
@@ -419,9 +422,9 @@ const StyledEditIcon = styled(EditIcon)`
     flex-shrink: 0;
     margin-left: 2px;
     transition: fill 0.2s linear;
-    &:hover {
-        fill: dimgray;
-    }
+        &:hover {
+            fill: #4a8cf7;
+        }
 `;
 
 const StyledEditDoneIcon = styled(EditDoneIcon)`
@@ -431,9 +434,9 @@ const StyledEditDoneIcon = styled(EditDoneIcon)`
     flex-shrink: 0;
     margin-left: 2px;
     transition: fill 0.2s linear;
-    &:hover {
-        fill: dimgray;
-    }
+        &:hover {
+            fill: #4a8cf7;
+        }
 `;
 
 const StyledCopyIcon = styled(CopyIcon)`
@@ -443,9 +446,9 @@ const StyledCopyIcon = styled(CopyIcon)`
     flex-shrink: 0;
     margin-left: 2px;
     transition: fill 0.2s linear;
-    &:hover {
-        fill: dimgray;
-    }
+        &:hover {
+            fill: #4a8cf7;
+        }
 `;
 
 const BlockHead = styled.div`

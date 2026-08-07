@@ -618,7 +618,7 @@ export default function ResultPanel() {
                         // Only show the panel's content when the panel is movable.
                         moveableReady && (
                             <Fragment>
-                                <Head ref={headElRef} data-testid="Head">
+                                <Head ref={headElRef} displayType={displayType} data-testid="Head">
                                     <SourceOption
                                         title={currentTranslator}
                                         activeKey={currentTranslator}
@@ -712,7 +712,7 @@ export default function ResultPanel() {
 
 export const MaxZIndex = 2147483647;
 const ColorPrimary = "#4a8cf7";
-const PanelBorderRadius = "8px";
+const PanelBorderRadius = "14px";
 export const ContentWrapperCenterClassName = "simplebar-content-wrapper-center";
 
 const GlobalStyle = createGlobalStyle`
@@ -799,8 +799,23 @@ const Panel = styled.div`
     z-index: ${MaxZIndex};
     border-radius: ${(props) => (props.displayType === "floating" ? PanelBorderRadius : 0)};
     overflow: visible;
-    box-shadow: 0px 8px 12px 5px rgba(0, 0, 0, 0.25);
-    background: rgba(235, 235, 235, 1);
+    box-shadow: 0 12px 40px rgba(31, 41, 55, 0.22), 0 2px 8px rgba(31, 41, 55, 0.1);
+    background: rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+
+    /* Floating panel: shrink-to-fit content so short translations don't leave
+       dead glass space below. The cap matches the default floating height
+       (floatingData.height = 0.4) so positioning/long-content scroll are unchanged. */
+    ${(props) =>
+        props.displayType === "floating"
+            ? `
+        height: auto !important;
+        max-height: 40vh;
+        min-height: 88px !important;
+    `
+            : ""}
 
     /* Normalize the style of panel */
     padding: 0;
@@ -808,7 +823,7 @@ const Panel = styled.div`
     border: none;
     font-size: 16px;
     font-weight: normal;
-    color: black;
+    color: #1f2430;
     line-height: 1;
     -webkit-text-size-adjust: 100%;
     box-sizing: border-box;
@@ -823,22 +838,36 @@ const Panel = styled.div`
         position: absolute;
         left: 0;
         right: 0;
+        top: 0;
         z-index: -1;
         display: block;
-        /* backdrop-filter: blur(6px); */
-        height: 100%;
+        height: 65%;
+        pointer-events: none;
         border-radius: ${(props) => (props.displayType === "floating" ? PanelBorderRadius : 0)};
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.55) 0%,
+            rgba(255, 255, 255, 0) 100%
+        );
     }
 `;
 
 const Head = styled.div`
-    padding: 4px;
+    padding: 8px 8px 8px 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex: 0 0 auto;
     overflow: visible;
     cursor: grab;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.4) 0%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    border-radius: ${(props) =>
+        props.displayType === "floating" ? `${PanelBorderRadius} ${PanelBorderRadius} 0 0` : "0"};
 `;
 
 const HeadIcons = styled.div`
@@ -857,22 +886,31 @@ const HeadIcon = styled.div`
     -moz-osx-font-smoothing: grayscale;
     cursor: pointer;
     font-size: 18px;
-    width: 24px;
-    height: 24px;
+    width: 30px;
+    height: 30px;
     margin: 2px;
-    background-color: rgba(255, 255, 255, 0.8);
-    border-radius: 15px;
+    border-radius: 9px;
+    background-color: rgba(0, 0, 0, 0.04);
+    transition: background-color 0.18s ease, transform 0.18s ease;
 
     svg {
-        fill: #8e8e93;
+        fill: #5f6368;
         width: 16px;
         height: 16px;
         display: block;
         transition: fill 0.2s linear;
     }
 
+    &:hover {
+        background-color: rgba(0, 0, 0, 0.08);
+    }
+
     &:hover svg {
-        fill: dimgray;
+        fill: ${ColorPrimary};
+    }
+
+    &:active {
+        transform: scale(0.92);
     }
 `;
 
@@ -887,6 +925,7 @@ const Body = styled.div`
     font-weight: normal;
     font-size: medium;
     position: relative;
+    padding-top: 6px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;

@@ -76,25 +76,33 @@ const ErrorContainer = styled.div`
 const ErrorInfo = styled.div`
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    margin: 10% 5%;
+    align-items: center;
+    text-align: center;
+    margin: 8% 6%;
+    padding: 20px 16px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
 `;
 
 const StyledErrorIcon = styled(ErrorIcon)`
-    width: 150px;
-    height: 150px;
+    width: 88px;
+    height: 88px;
     display: block;
-    align-self: center;
-    fill: #dd5145;
-
-    :hover {
-        fill: #dd5145;
-    }
+    margin-bottom: 8px;
+    fill: #ef4444;
 `;
 
 const ErrorType = styled.p`
-    font-weight: bold;
+    font-weight: 700;
     font-size: large;
+    color: #ef4444;
+    margin: 4px 0;
 `;
 
-const ErrorMessage = styled.p``;
+const ErrorMessage = styled.p`
+    color: #5f6675;
+    font-size: small;
+    margin: 2px 0;
+    word-break: break-word;
+`;

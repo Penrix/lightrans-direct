@@ -92,6 +92,7 @@ export default Dropdown;
 /**
  * STYLE FOR THE COMPONENT START
  */
+const ColorPrimary = "#4a8cf7";
 const StyledSelect = styled.div`
     position: relative;
     display: flex;
@@ -100,26 +101,29 @@ const StyledSelect = styled.div`
 `;
 const Menu = styled.ul`
     display: ${(props) => (props.open ? "block" : "none")};
-    min-width: 100px;
-    margin: 0;
+    min-width: 120px;
+    margin: 4px 0 0;
     list-style: none;
     font-size: 14px;
     text-align: left;
-    background-color: #fff;
-    border-radius: 6px;
-    padding: 6px 0;
+    background-color: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 10px;
+    padding: 6px;
     position: absolute;
     left: 0;
     top: 100%;
     z-index: 6;
     float: left;
-    box-shadow: 0 0 10px rgb(0 0 0 / 6%), 0 4px 4px rgb(0 0 0 / 12%);
+    box-shadow: 0 12px 32px rgba(31, 41, 55, 0.18);
 `;
 const Title = styled.a`
     display: flex;
     align-items: center;
     margin-bottom: 0;
-    font-weight: 400;
+    font-weight: 500;
     text-align: center;
     cursor: pointer;
     outline: 0;
@@ -129,42 +133,45 @@ const Title = styled.a`
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    padding: 2px 8px;
+    padding: 4px 10px;
     font-size: 14px;
     line-height: 1.5;
-    border-radius: 6px;
-    transition: color 0.2s linear, background-color 0.3s linear;
-    color: gray;
-    background-color: transparent;
+    border-radius: 8px;
+    transition: color 0.2s linear, background-color 0.2s linear;
+    color: #1f2430;
+    background-color: rgba(0, 0, 0, 0.04);
     overflow: hidden;
     &:hover {
-        color: #575757;
-        background: #e4e4e4;
+        color: ${ColorPrimary};
+        background: rgba(74, 140, 247, 0.1);
     }
     &:hover svg {
-        fill: #575757;
+        fill: ${ColorPrimary};
     }
 `;
 const StyledArrowDownIcon = styled(ArrowDownIcon)`
-    fill: #8e8e93;
+    fill: #5f6368;
     margin-left: 4px;
+    transition: fill 0.2s linear;
 `;
 
 /* Style of Item */
 const ActiveStyle = css`
-    color: #1675e0;
+    color: #4a8cf7;
     font-weight: 700;
-    background-color: rgba(242, 250, 255, 0.5);
+    background-color: rgba(74, 140, 247, 0.1);
+    border-radius: 6px;
     &:hover {
-        color: #1675e0;
-        background-color: rgba(242, 250, 255, 0.5);
+        color: #4a8cf7;
+        background-color: rgba(74, 140, 247, 0.1);
     }
 `;
 const InActiveStyle = css`
-    color: #575757;
+    color: #3c4250;
+    border-radius: 6px;
     &:hover {
-        color: #575757;
-        background-color: #f2faff;
+        color: #3c4250;
+        background-color: rgba(0, 0, 0, 0.05);
     }
 `;
 const Item = styled.li`
@@ -179,13 +186,8 @@ const Item = styled.li`
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    -webkit-transition: color 0.3s linear, background-color 0.3s linear;
-    transition: color 0.3s linear, background-color 0.3s linear;
-    transition: color 0.3s linear, background-color 0.3s linear;
-    transition-property: color, background-color;
-    transition-duration: 0.3s, 0.3s;
-    transition-timing-function: linear, linear;
-    transition-delay: 0s, 0s;
+    -webkit-transition: color 0.2s linear, background-color 0.2s linear;
+    transition: color 0.2s linear, background-color 0.2s linear;
     ${(props) => (props.active ? ActiveStyle : InActiveStyle)}
 `;
 /**

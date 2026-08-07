@@ -88,27 +88,27 @@ const Handle = styled.div`
     cursor: pointer;
     background: linear-gradient(
         transparent 0%,
-        rgba(250, 250, 250, 0.3) 30%,
-        rgb(250, 250, 250) 100%
+        rgba(255, 255, 255, 0.4) 30%,
+        rgb(255, 255, 255) 100%
     );
     ${(props) => (props.fold ? "position: absolute; bottom: 0;" : "")}
 
     &:hover {
         background: linear-gradient(
             transparent 0%,
-            rgba(250, 250, 250, 0.6) 30%,
-            rgb(250, 250, 250) 100%
+            rgba(255, 255, 255, 0.7) 30%,
+            rgb(255, 255, 255) 100%
         );
     }
 
     &:hover svg {
-        fill: dimgray;
+        fill: #4a8cf7;
     }
 `;
 const IconStyle = css`
     width: 20px;
     height: 20px;
-    fill: #959595;
+    fill: #5f6368;
 `;
 const StyledArrowDownIcon = styled(ArrowDownIcon)`
     ${IconStyle};
