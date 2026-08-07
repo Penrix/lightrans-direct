@@ -64,7 +64,7 @@ Lightrans 网页版已上线，项目地址：[Lightrans_web](https://github.com
     <span style="flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:space-between;gap:6px;height:34px;background:#f3f5fa;border-radius:9px;padding:0 10px;font-size:13px;color:#1f2430;box-sizing:border-box;"><span>中文简体</span><span style="color:#9aa3b2;">▾</span></span>
   </div>
   <div style="margin-top:12px;padding:12px 0 0;border-top:1px solid #eef0f4;font-size:14px;color:#1f2430;">你好，世界</div>
-  <div style="text-align:center;font-size:11px;color:#9aa3b2;margin-top:14px;">©2025 lightrans</div>
+  <div style="text-align:center;font-size:11px;color:#9aa3b2;margin-top:14px;">©2026 lightrans</div>
 </div>
 ## 功能特性
 
