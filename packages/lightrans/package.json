@@ -1,6 +1,6 @@
 {
     "name": "lightrans",
-    "version": "0.0.2",
+    "version": "0.0.5",
     "private": true,
     "scripts": {
         "test": "jest",

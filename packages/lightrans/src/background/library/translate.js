@@ -563,6 +563,9 @@ function translatePage(channel, model) {
                         console.error('lightrans: document.body is not available');
                         return;
                     }
+
+                    // 页面翻译工具条的标题元素引用（翻译完成时更新）
+                    let bannerTitleEl = null;
                     
                     // 存储原始文本内容，用于翻译和恢复
                     window.edgeTranslateOriginalTextNodes = [];
@@ -641,6 +644,9 @@ function translatePage(channel, model) {
                                 // 只替换尚未替换的节点
                                 if (node.nodeValue !== translatedTexts[textIndex]) {
                                     node.nodeValue = translatedTexts[textIndex];
+                                    if (window.edgeTranslateOriginalTextNodes && window.edgeTranslateOriginalTextNodes[index]) {
+                                        window.edgeTranslateOriginalTextNodes[index].translatedText = translatedTexts[textIndex];
+                                    }
                                     replacedCount++;
                                     totalReplaced++;
                                 }
@@ -669,6 +675,7 @@ function translatePage(channel, model) {
                         // 检查是否所有文本都已翻译完成
                         if (totalTranslated === allTexts.length) {
                             console.log('lightrans: All texts translated, total replaced:', totalReplaced, 'nodes');
+                            if (bannerTitleEl) bannerTitleEl.textContent = 'Lightrans 已翻译此页';
                         }
                     }
                     
@@ -737,6 +744,74 @@ function translatePage(channel, model) {
                             clearInterval(interval);
                         }
                     }, 500);
+
+                    // 创建页面翻译工具条：显示原网页 / 显示译文 / 关闭
+                    function createBanner() {
+                        if (document.getElementById('lightrans-page-banner')) return;
+                        const banner = document.createElement('div');
+                        banner.id = 'lightrans-page-banner';
+                        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;background:#ffffff;color:#1f2430;font:14px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 1px 6px rgba(0,0,0,0.18);box-sizing:border-box;';
+
+                        const title = document.createElement('span');
+                        title.textContent = 'Lightrans 翻译中…';
+                        title.style.cssText = 'font-weight:600;white-space:nowrap;';
+                        banner.appendChild(title);
+                        bannerTitleEl = title;
+
+                        const spacer = document.createElement('span');
+                        spacer.style.cssText = 'flex:1;';
+                        banner.appendChild(spacer);
+
+                        function makeBtn(label) {
+                            const b = document.createElement('button');
+                            b.textContent = label;
+                            b.style.cssText = 'cursor:pointer;border:1px solid #d0d5dd;background:#f5f7fa;color:#1f2430;border-radius:6px;padding:5px 10px;font:13px/1 system-ui,sans-serif;';
+                            b.onmouseenter = () => { b.style.background = '#e9edf2'; };
+                            b.onmouseleave = () => { b.style.background = '#f5f7fa'; };
+                            return b;
+                        }
+
+                        const btnOriginal = makeBtn('显示原网页');
+                        const btnTrans = makeBtn('显示译文');
+                        const btnClose = makeBtn('✕');
+                        btnClose.style.cssText += 'font-size:15px;line-height:1;padding:3px 9px;';
+
+                        banner.appendChild(btnOriginal);
+                        banner.appendChild(btnTrans);
+                        banner.appendChild(btnClose);
+                        document.body.appendChild(banner);
+
+                        // 将页面主体下移，避免被工具条遮挡
+                        document.body.style.marginTop = '40px';
+
+                        const originals = window.edgeTranslateOriginalTextNodes || [];
+
+                        btnOriginal.addEventListener('click', () => {
+                            originals.forEach((item) => {
+                                if (item && item.node && item.originalText !== undefined) {
+                                    item.node.nodeValue = item.originalText;
+                                }
+                            });
+                        });
+
+                        btnTrans.addEventListener('click', () => {
+                            originals.forEach((item) => {
+                                if (item && item.node && item.translatedText) {
+                                    item.node.nodeValue = item.translatedText;
+                                }
+                            });
+                        });
+
+                        btnClose.addEventListener('click', () => {
+                            if (banner.parentNode) banner.parentNode.removeChild(banner);
+                            document.body.style.marginTop = '';
+                        });
+                    }
+
+                    createBanner();
+                    if (allTexts.length === 0 && bannerTitleEl) {
+                        bannerTitleEl.textContent = 'Lightrans 已翻译此页';
+                    }
                 })();
             `
         }, (result) => {
