@@ -34,6 +34,12 @@ const DEFAULT_SETTINGS = {
     DefaultPageTranslator: "AITrans",
     // Page translation display mode: "original" / "translated" / "bilingual"
     PageTranslationDisplayMode: "translated",
+    // 自建中继地址（EdgeOne /api/translate）。默认使用官方中继，开箱即用、无需 API Key。
+    RelayEndpoint: "https://trans.hin.cool/api/translate",
+    // 翻译服务模式：official（官方中继，零配置免 Key）/ custom（自定义中继 + 自有 API Key）
+    TranslationService: "official",
+    // 自定义中继模式下使用的 SiliconFlow API Key（仅 custom 模式读取）
+    ApiKey: "",
     HybridTranslatorConfig: {
         // The translators used in current hybrid translate.
         translators: ["AITrans"],

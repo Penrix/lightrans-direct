@@ -51,6 +51,67 @@
                     </div>
                 </div>
 
+                <label class="setting-title">翻译服务（Relay）</label>
+                <div class="row">
+                    <div class="column">
+                        <label
+                            class="checked-label"
+                            style="justify-content: flex-start; gap: 8px;"
+                        >
+                            服务模式：
+                            <select
+                                id="translation-service"
+                                setting-type="select"
+                                setting-path="TranslationService"
+                                class="translator-config"
+                            >
+                                <option value="official">官方中继（默认，免 Key）</option>
+                                <option value="custom">自定义中继（需填 Key）</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <div class="row" id="relay-row" style="display: none;">
+                    <div class="column" style="flex: 1 1 auto; min-width: 0;">
+                        <label
+                            for="relay-endpoint"
+                            class="checked-label"
+                            style="justify-content: flex-start; gap: 8px; width: 100%;"
+                        >
+                            <span style="white-space: nowrap;">中继地址：</span>
+                            <input
+                                id="relay-endpoint"
+                                type="text"
+                                setting-type="text"
+                                setting-path="RelayEndpoint"
+                                class="translator-config"
+                                placeholder="https://trans.hin.cool/api/translate"
+                                style="flex: 1 1 auto; min-width: 0; width: 100%;"
+                            />
+                        </label>
+                    </div>
+                </div>
+                <div class="row" id="apikey-row" style="display: none;">
+                    <div class="column" style="flex: 1 1 auto; min-width: 0;">
+                        <label
+                            for="api-key"
+                            class="checked-label"
+                            style="justify-content: flex-start; gap: 8px; width: 100%;"
+                        >
+                            <span style="white-space: nowrap;">API Key：</span>
+                            <input
+                                id="api-key"
+                                type="password"
+                                setting-type="password"
+                                setting-path="ApiKey"
+                                class="translator-config"
+                                placeholder="自定义中继模式下填写你的 SiliconFlow API Key"
+                                style="flex: 1 1 auto; min-width: 0; width: 100%;"
+                            />
+                        </label>
+                    </div>
+                </div>
+
                 <label
                     for="layout-settings"
                     class="setting-title i18n"

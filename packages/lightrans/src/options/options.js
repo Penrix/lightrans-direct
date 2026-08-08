@@ -104,9 +104,42 @@ window.onload = () => {
                         );
                     };
                     break;
+                case "text":
+                    element.value = settingItemValue || "";
+                    // update setting value
+                    element.oninput = (event) => {
+                        const target = event.target;
+                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
+                        saveOption(result, settingItemPath, target.value);
+                    };
+                    break;
+                case "password":
+                    element.value = settingItemValue || "";
+                    // update setting value
+                    element.oninput = (event) => {
+                        const target = event.target;
+                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
+                        saveOption(result, settingItemPath, target.value);
+                    };
+                    break;
                 default:
                     break;
             }
+        }
+
+        // 服务模式切换时显隐中继地址与 API Key 输入框（仅自定义中继需要）
+        const serviceSelect = document.getElementById("translation-service");
+        const relayRow = document.getElementById("relay-row");
+        const apiKeyRow = document.getElementById("apikey-row");
+        const syncRelayVisibility = () => {
+            if (!serviceSelect) return;
+            const isCustom = (serviceSelect.value === "custom");
+            if (relayRow) relayRow.style.display = isCustom ? "" : "none";
+            if (apiKeyRow) apiKeyRow.style.display = isCustom ? "" : "none";
+        };
+        if (serviceSelect) {
+            syncRelayVisibility();
+            serviceSelect.addEventListener("change", syncRelayVisibility);
         }
     });
 };

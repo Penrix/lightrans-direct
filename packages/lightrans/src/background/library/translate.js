@@ -18,7 +18,7 @@ class TranslatorManager {
          * @type {Promise<Void>} Initialize configurations.
          */
         this.config_loader = getOrSetDefaultSettings(
-            ["languageSetting", "OtherSettings", "AIModel"],
+            ["languageSetting", "OtherSettings", "AIModel", "RelayEndpoint", "ApiKey", "TranslationService"],
             DEFAULT_SETTINGS
         ).then((configs) => {
             // Init AI translator.
@@ -31,18 +31,24 @@ class TranslatorManager {
 
             // Translation language settings.
             this.LANGUAGE_SETTING = configs.languageSetting;
-            
+
             // Other settings.
             this.OTHER_SETTINGS = configs.OtherSettings;
 
             // The default translator to use.
             this.DEFAULT_TRANSLATOR = "AITrans";
-            
+
             // The default AI model to use.
             this.AI_MODEL = configs.AIModel;
-            
-            // Set the AI model for the translator.
+
+            // The relay endpoint (EdgeOne /api/translate).
+            this.RELAY_ENDPOINT = configs.RelayEndpoint || "";
+
+            // Set the AI model, relay endpoint, service mode and api key for the translator.
             this.AI_TRANSLATOR.setCurrentModel(this.AI_MODEL);
+            this.AI_TRANSLATOR.setRelayEndpoint(this.RELAY_ENDPOINT);
+            this.AI_TRANSLATOR.setServiceMode(configs.TranslationService || "official");
+            this.AI_TRANSLATOR.setApiKey(configs.ApiKey || "");
             
             // 在配置加载完成后更新菜单
             this.updateTranslatePageMenu();
@@ -177,6 +183,22 @@ class TranslatorManager {
                         this.AI_MODEL = changes["AIModel"].newValue;
                         // Update the AI model for the translator.
                         this.AI_TRANSLATOR.setCurrentModel(this.AI_MODEL);
+                    }
+
+                    if (changes["RelayEndpoint"]) {
+                        this.RELAY_ENDPOINT = changes["RelayEndpoint"].newValue || "";
+                        // Update the relay endpoint for the translator.
+                        this.AI_TRANSLATOR.setRelayEndpoint(this.RELAY_ENDPOINT);
+                    }
+
+                    if (changes["TranslationService"]) {
+                        // Update the translation service mode for the translator.
+                        this.AI_TRANSLATOR.setServiceMode(changes["TranslationService"].newValue || "official");
+                    }
+
+                    if (changes["ApiKey"]) {
+                        // Update the api key for the translator (custom mode only).
+                        this.AI_TRANSLATOR.setApiKey(changes["ApiKey"].newValue || "");
                     }
                 }
             }).bind(this)
