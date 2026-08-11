@@ -46,7 +46,7 @@ npm run dev
 
 本项目是 [EdgeTranslate](https://github.com/EdgeTranslate/EdgeTranslate) 的分支和修改版本，扩展了其功能并提高了性能。
 
-感谢[硅基流动](https://siliconflow.cn/)提供 api 支持，本项目的基础功能才能得以实现。
+感谢[<img src="doc/SiliconFlow.png" alt="SiliconFlow" height="20">](https://siliconflow.cn/)提供 api 支持，本项目的基础功能才能得以实现。
 
 ## 许可证
 

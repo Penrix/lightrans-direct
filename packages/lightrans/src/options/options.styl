@@ -98,6 +98,35 @@ select {
     }
 }
 
+/* Text & password inputs (API Key / custom model name) */
+input.translator-config {
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid #e2e6ef;
+    border-radius: 10px;
+    background-color: #f7f9fc;
+    font-size: 14px;
+    color: #1f2430;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+    &::placeholder {
+        color: #aab2c0;
+    }
+
+    &:hover {
+        border-color: #cfd6e4;
+        background-color: #f1f4fa;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: color-primary;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(74, 140, 247, 0.18);
+    }
+}
+
 .space {
     display: inline-block;
     width: 5px;

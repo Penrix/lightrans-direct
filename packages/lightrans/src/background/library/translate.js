@@ -18,7 +18,7 @@ class TranslatorManager {
          * @type {Promise<Void>} Initialize configurations.
          */
         this.config_loader = getOrSetDefaultSettings(
-            ["languageSetting", "OtherSettings", "AIModel", "RelayEndpoint", "ApiKey", "TranslationService"],
+            ["languageSetting", "OtherSettings", "AIModel", "ApiKey", "TranslationService", "CustomModel", "CustomModelName"],
             DEFAULT_SETTINGS
         ).then((configs) => {
             // Init AI translator.
@@ -38,18 +38,24 @@ class TranslatorManager {
             // The default translator to use.
             this.DEFAULT_TRANSLATOR = "AITrans";
 
-            // The default AI model to use.
+            // 服务模式与自定义模型相关状态
+            this.SERVICE_MODE = configs.TranslationService || "free";
+            this.CUSTOM_MODEL = !!configs.CustomModel;
+            this.CUSTOM_MODEL_NAME = configs.CustomModelName || "";
             this.AI_MODEL = configs.AIModel;
 
-            // The relay endpoint (EdgeOne /api/translate).
-            this.RELAY_ENDPOINT = configs.RelayEndpoint || "";
+            // 计算有效模型：自定义模式且勾选了自定义模型时，使用用户手填的模型名。
+            // 兜底：免费模式或非自定义时若 AIModel 缺失，回退到预设模型首个，避免空模型被后续 setCurrentModel 静默 no-op。
+            const fallbackModel = this.AI_TRANSLATOR.getAvailableModels()[0];
+            const effectiveModel = (this.SERVICE_MODE === "custom" && this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
+                ? this.CUSTOM_MODEL_NAME
+                : (this.AI_MODEL || fallbackModel);
 
-            // Set the AI model, relay endpoint, service mode and api key for the translator.
-            this.AI_TRANSLATOR.setCurrentModel(this.AI_MODEL);
-            this.AI_TRANSLATOR.setRelayEndpoint(this.RELAY_ENDPOINT);
-            this.AI_TRANSLATOR.setServiceMode(configs.TranslationService || "official");
+            // 设置模型、服务模式与 API Key
+            this.AI_TRANSLATOR.setCurrentModel(effectiveModel);
+            this.AI_TRANSLATOR.setServiceMode(this.SERVICE_MODE);
             this.AI_TRANSLATOR.setApiKey(configs.ApiKey || "");
-            
+
             // 在配置加载完成后更新菜单
             this.updateTranslatePageMenu();
         });
@@ -181,24 +187,34 @@ class TranslatorManager {
                     
                     if (changes["AIModel"]) {
                         this.AI_MODEL = changes["AIModel"].newValue;
-                        // Update the AI model for the translator.
-                        this.AI_TRANSLATOR.setCurrentModel(this.AI_MODEL);
-                    }
-
-                    if (changes["RelayEndpoint"]) {
-                        this.RELAY_ENDPOINT = changes["RelayEndpoint"].newValue || "";
-                        // Update the relay endpoint for the translator.
-                        this.AI_TRANSLATOR.setRelayEndpoint(this.RELAY_ENDPOINT);
                     }
 
                     if (changes["TranslationService"]) {
+                        this.SERVICE_MODE = changes["TranslationService"].newValue || "free";
                         // Update the translation service mode for the translator.
-                        this.AI_TRANSLATOR.setServiceMode(changes["TranslationService"].newValue || "official");
+                        this.AI_TRANSLATOR.setServiceMode(this.SERVICE_MODE);
+                    }
+
+                    if (changes["CustomModel"]) {
+                        this.CUSTOM_MODEL = !!changes["CustomModel"].newValue;
+                    }
+
+                    if (changes["CustomModelName"]) {
+                        this.CUSTOM_MODEL_NAME = changes["CustomModelName"].newValue || "";
                     }
 
                     if (changes["ApiKey"]) {
                         // Update the api key for the translator (custom mode only).
                         this.AI_TRANSLATOR.setApiKey(changes["ApiKey"].newValue || "");
+                    }
+
+                    // 任一影响有效模型的因素变化，重新计算并设置
+                    if (changes["AIModel"] || changes["TranslationService"] || changes["CustomModel"] || changes["CustomModelName"]) {
+                        const fallbackModel = this.AI_TRANSLATOR.getAvailableModels()[0];
+                        const effectiveModel = (this.SERVICE_MODE === "custom" && this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
+                            ? this.CUSTOM_MODEL_NAME
+                            : (this.AI_MODEL || fallbackModel);
+                        this.AI_TRANSLATOR.setCurrentModel(effectiveModel);
                     }
                 }
             }).bind(this)

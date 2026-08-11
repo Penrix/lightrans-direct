@@ -4,6 +4,7 @@
         <meta charset="utf-8" />
         <title class="i18n" data-i18n-name="SettingsTitle"></title>
         <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <link rel="icon" href="../icon/icon128.png" />
         <link type="text/css" rel="stylesheet" href="./options.css" />
     </head>
 
@@ -16,42 +17,7 @@
             轻量翻译
         </header>
             <div class="content">
-                <label class="setting-title">基础设置</label>
-                <div class="row">
-                    <div class="column">
-                        <label
-                            for="ai-model"
-                            class="checked-label"
-                            style="justify-content: flex-start; gap: 8px;"
-                        >
-                            翻译模型：
-                            <select
-                                id="ai-model"
-                                setting-type="select"
-                                setting-path="AIModel"
-                                class="translator-config"
-                            ></select>
-                        </label>
-                    </div>
-                    <div class="column">
-                        <label
-                            class="checked-label"
-                            style="justify-content: flex-start; gap: 8px;"
-                        >
-                            页面翻译：
-                            <select
-                                setting-type="select"
-                                setting-path="PageTranslationDisplayMode"
-                            >
-                                <option value="original">仅原文</option>
-                                <option value="translated">仅译文</option>
-                                <option value="bilingual">对照（原文 + 译文）</option>
-                            </select>
-                        </label>
-                    </div>
-                </div>
-
-                <label class="setting-title">翻译服务（Relay）</label>
+                <label class="setting-title">翻译服务</label>
                 <div class="row">
                     <div class="column">
                         <label
@@ -65,29 +31,44 @@
                                 setting-path="TranslationService"
                                 class="translator-config"
                             >
-                                <option value="official">官方中继（默认，免 Key）</option>
-                                <option value="custom">自定义中继（需填 Key）</option>
+                                <option value="free">硅基流动（免费）</option>
+                                <option value="custom">硅基流动（自定义）</option>
                             </select>
                         </label>
                     </div>
-                </div>
-                <div class="row" id="relay-row" style="display: none;">
-                    <div class="column" style="flex: 1 1 auto; min-width: 0;">
+                    <div class="column">
                         <label
-                            for="relay-endpoint"
+                            for="ai-model"
                             class="checked-label"
-                            style="justify-content: flex-start; gap: 8px; width: 100%;"
+                            style="justify-content: flex-start; gap: 8px;"
                         >
-                            <span style="white-space: nowrap;">中继地址：</span>
+                            翻译模型：
+                            <select
+                                id="ai-model"
+                                setting-type="select"
+                                setting-path="AIModel"
+                                class="translator-config"
+                            ></select>
                             <input
-                                id="relay-endpoint"
+                                id="ai-model-input"
                                 type="text"
                                 setting-type="text"
-                                setting-path="RelayEndpoint"
+                                setting-path="CustomModelName"
                                 class="translator-config"
-                                placeholder="https://trans.hin.cool/api/translate"
-                                style="flex: 1 1 auto; min-width: 0; width: 100%;"
+                                placeholder="输入模型名称，如 Qwen/Qwen3-8B"
+                                style="display: none; flex: 1 1 auto; min-width: 0;"
                             />
+                            <span id="custom-model-col" style="display: none; margin-left: 8px;">
+                                <input
+                                    type="checkbox"
+                                    id="custom-model"
+                                    value="custom-model"
+                                    setting-type="switch"
+                                    setting-path="CustomModel"
+                                />
+                                <span class="space"></span>
+                                自定义
+                            </span>
                         </label>
                     </div>
                 </div>
@@ -105,7 +86,7 @@
                                 setting-type="password"
                                 setting-path="ApiKey"
                                 class="translator-config"
-                                placeholder="自定义中继模式下填写你的 SiliconFlow API Key"
+                                placeholder="硅基流动（自定义）模式下填写你的 SiliconFlow API Key"
                                 style="flex: 1 1 auto; min-width: 0; width: 100%;"
                             />
                         </label>
@@ -120,54 +101,20 @@
                 <div id="layout-settings">
                     <div class="row">
                         <div class="column">
-                            <input
-                                type="checkbox"
-                                value="resize"
-                                setting-type="switch"
-                                setting-path="LayoutSettings Resize"
-                                class="switch"
-                                id="Resize"
-                            />
-                            <span class="space"></span>
                             <label
-                                for="Resize"
-                                class="checked-label i18n"
-                                data-i18n-name="ResizeSetting"
-                            ></label>
-                        </div>
-                        <div class="column">
-                            <input
-                                type="checkbox"
-                                value="rtl"
-                                setting-type="switch"
-                                setting-path="LayoutSettings RTL"
-                                class="switch"
-                                id="RTL"
-                            />
-                            <span class="space"></span>
-                            <label
-                                for="RTL"
-                                class="checked-label i18n"
-                                data-i18n-name="RTLSetting"
-                            ></label>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="column">
-                            <input
-                                type="checkbox"
-                                value="FoldLongContent"
-                                setting-type="switch"
-                                setting-path="LayoutSettings FoldLongContent"
-                                class="switch"
-                                id="FoldLongContent"
-                            />
-                            <span class="space"></span>
-                            <label
-                                for="FoldLongContent"
-                                class="checked-label i18n"
-                                data-i18n-name="FoldLongContentSetting"
-                            ></label>
+                                class="checked-label"
+                                style="justify-content: flex-start; gap: 8px;"
+                            >
+                                页面翻译：
+                                <select
+                                    setting-type="select"
+                                    setting-path="PageTranslationDisplayMode"
+                                >
+                                    <option value="original">仅原文</option>
+                                    <option value="translated">仅译文</option>
+                                    <option value="bilingual">对照（原文 + 译文）</option>
+                                </select>
+                            </label>
                         </div>
                         <div class="column">
                             <label
@@ -204,6 +151,40 @@
                                     ></option>
                                 </select>
                             </label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                value="resize"
+                                setting-type="switch"
+                                setting-path="LayoutSettings Resize"
+                                class="switch"
+                                id="Resize"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="Resize"
+                                class="checked-label i18n"
+                                data-i18n-name="ResizeSetting"
+                            ></label>
+                        </div>
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                value="FoldLongContent"
+                                setting-type="switch"
+                                setting-path="LayoutSettings FoldLongContent"
+                                class="switch"
+                                id="FoldLongContent"
+                            />
+                            <span class="space"></span>
+                            <label
+                                for="FoldLongContent"
+                                class="checked-label i18n"
+                                data-i18n-name="FoldLongContentSetting"
+                            ></label>
                         </div>
                     </div>
                 </div>
@@ -314,13 +295,18 @@
                 </div>
             </div>
             <footer>
+                <div class="footer-sponsor" style="text-align: center;">
+                    <a href="https://siliconflow.cn/" target="_blank" rel="noopener noreferrer">
+                        <img src="../img/SiliconFlow.png" alt="SiliconFlow" style="height: 28px; margin: 0 auto 10px; display: block;" />
+                    </a>
+                </div>
                 ©2026
-                <a href="https://github.com/W4J1e/Lightrans" target="blank">
+                <a href="https://github.com/W4J1e/Lightrans" target="_blank">
                     lightrans
                 </a>
                 <span class="space"></span>
-                Powered by
-                <a href="https://hin.cool" target="blank"> W4J1e </a>
+                by
+                <a href="https://hin.cool" target="_blank"> W4J1e </a>
             </footer>
         </div>
     </body>

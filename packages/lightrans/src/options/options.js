@@ -127,19 +127,43 @@ window.onload = () => {
             }
         }
 
-        // 服务模式切换时显隐中继地址与 API Key 输入框（仅自定义中继需要）
+        // 服务模式切换：自定义模式显示 API Key 与「自定义」选项，免费模式隐藏
         const serviceSelect = document.getElementById("translation-service");
-        const relayRow = document.getElementById("relay-row");
         const apiKeyRow = document.getElementById("apikey-row");
-        const syncRelayVisibility = () => {
+        const customModelCol = document.getElementById("custom-model-col");
+        const customModelCheckbox = document.getElementById("custom-model");
+        const aiModelSelect = document.getElementById("ai-model");
+        const aiModelInput = document.getElementById("ai-model-input");
+
+        // 「自定义」勾选时：隐藏模型下拉、显示同位可编辑输入框（不额外占行）
+        const syncCustomModelVisibility = () => {
+            if (!customModelCheckbox) return;
+            const checked = customModelCheckbox.checked;
+            if (aiModelSelect) aiModelSelect.style.display = checked ? "none" : "";
+            if (aiModelInput) aiModelInput.style.display = checked ? "" : "none";
+        };
+
+        const syncServiceVisibility = () => {
             if (!serviceSelect) return;
             const isCustom = (serviceSelect.value === "custom");
-            if (relayRow) relayRow.style.display = isCustom ? "" : "none";
             if (apiKeyRow) apiKeyRow.style.display = isCustom ? "" : "none";
+            if (customModelCol) customModelCol.style.display = isCustom ? "" : "none";
+            if (!isCustom) {
+                // 切回免费模式：恢复下拉、隐藏输入
+                if (aiModelSelect) aiModelSelect.style.display = "";
+                if (aiModelInput) aiModelInput.style.display = "none";
+            } else {
+                syncCustomModelVisibility();
+            }
         };
+
         if (serviceSelect) {
-            syncRelayVisibility();
-            serviceSelect.addEventListener("change", syncRelayVisibility);
+            syncServiceVisibility();
+            serviceSelect.addEventListener("change", syncServiceVisibility);
+        }
+        if (customModelCheckbox) {
+            syncCustomModelVisibility();
+            customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
         }
     });
 };
