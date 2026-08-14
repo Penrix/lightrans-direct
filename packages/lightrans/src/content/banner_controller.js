@@ -106,7 +106,7 @@ class BannerController {
      */
     googleMessageHandler(msg) {
         let data = JSON.parse(msg.data);
-        if (!data.type || data.type !== "edge_translate_page_translate_event") return;
+        if (!data.type || data.type !== "lightrans_page_translate_event") return;
 
         switch (data.event) {
             case "page_moved":

@@ -19,19 +19,19 @@ import CloseIcon from "./icons/close.svg";
 export default function NotifierTemplate(props) {
     return (
         <div
-            class={`edge-translate-notifier-item edge-translate-notifier-show-animation edge-translate-notifier-${props.type}`}
+            class={`lightrans-notifier-item lightrans-notifier-show-animation lightrans-notifier-${props.type}`}
         >
-            <div class="edge-translate-notifier-icon">
+            <div class="lightrans-notifier-icon">
                 {props.type === "success" && <SuccessIcon />}
                 {props.type === "info" && <InfoIcon />}
                 {props.type === "warning" && <WarningIcon />}
                 {props.type === "error" && <ErrorIcon />}
             </div>
-            <div class="edge-translate-notifier-content">
-                <div class="edge-translate-notifier-title">{props.title}</div>
-                <div class="edge-translate-notifier-detail">{props.detail}</div>
+            <div class="lightrans-notifier-content">
+                <div class="lightrans-notifier-title">{props.title}</div>
+                <div class="lightrans-notifier-detail">{props.detail}</div>
             </div>
-            <div class="edge-translate-notifier-close">
+            <div class="lightrans-notifier-close">
                 {(props.closeIcon || props.duration <= 0) && <CloseIcon />}
             </div>
         </div>

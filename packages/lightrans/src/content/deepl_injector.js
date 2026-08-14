@@ -10,7 +10,7 @@
     if (window === window.parent) return;
 
     window.addEventListener("message", (msg) => {
-        if (!msg.data.type || msg.data.type !== "edge_translate_deepl_request") return;
+        if (!msg.data.type || msg.data.type !== "lightrans_deepl_request") return;
 
         /**
          * Count the time that we have waited for.
@@ -40,7 +40,7 @@
                  * Got the translating result, send it back.
                  */
                 window.parent.postMessage(
-                    { type: "edge_translate_deepl_response", status: 200, result },
+                    { type: "lightrans_deepl_response", status: 200, result },
                     chrome.runtime.getURL("")
                 );
                 clearInterval(intervalId);
@@ -50,7 +50,7 @@
                  */
                 window.parent.postMessage(
                     {
-                        type: "edge_translate_deepl_response",
+                        type: "lightrans_deepl_response",
                         status: 504,
                         errorMsg: "Wait result timeout!",
                     },

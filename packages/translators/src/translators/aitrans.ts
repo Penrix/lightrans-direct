@@ -148,27 +148,6 @@ class AITranslator {
     }
 
     /**
-     * Pronounce text using AItrans.
-     *
-     * @param _text text to pronounce
-     * @param _language language of text
-     * @param _speed pronunciation speed
-     *
-     * @returns Promise of pronunciation finished
-     */
-    async pronounce(_text: string, _language: string, _speed: string): Promise<void> {
-        // SiliconFlow API doesn't provide pronunciation, so we'll just resolve
-        return Promise.resolve();
-    }
-
-    /**
-     * Stop pronunciation.
-     */
-    stopPronounce(): void {
-        // SiliconFlow API doesn't provide pronunciation, so this is a no-op
-    }
-
-    /**
      * Get supported languages.
      *
      * @returns Set of supported languages

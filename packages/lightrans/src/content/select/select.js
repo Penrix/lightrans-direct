@@ -24,7 +24,7 @@ if (translationButtonContainer.contentDocument === null) {
     renderButton();
 }
 document.documentElement.removeChild(iframeContainer);
-translationButtonContainer.id = "edge-translate-button";
+translationButtonContainer.id = "lightrans-button";
 translationButtonContainer.style.backgroundColor = "white"; // programatically set style to compatible with the extension 'Dark Reader'
 
 /**
@@ -171,8 +171,6 @@ function buttonClickHandler(event) {
     event.stopPropagation();
     if (event.button === 0) {
         translateSubmit();
-    } else if (event.button === 2) {
-        pronounceSubmit();
     }
 }
 
@@ -310,18 +308,6 @@ function shouldTranslate() {
     );
 }
 
-/**
- * 处理发音快捷键
- */
-function pronounceSubmit() {
-    let selection = getSelection();
-    if (selection.text && selection.text.length > 0) {
-        channel.request("pronounce", {
-            text: selection.text,
-            language: "auto",
-        });
-    }
-}
 
 /**
  * execute this function to make the translation button disappear
@@ -423,9 +409,6 @@ channel.on("command", (detail) => {
     switch (detail.command) {
         case "translate_selected":
             translateSubmit();
-            break;
-        case "pronounce_selected":
-            pronounceSubmit();
             break;
         case "cancel_page_translate":
             cancelPageTranslate();

@@ -10,7 +10,7 @@ import NotifierTemplate from "./notifier.jsx";
 import { delayPromise } from "common/scripts/promise.js";
 
 // prefix for CSS selector name
-const SELECTOR_PREFIX = "edge-translate-notifier-";
+const SELECTOR_PREFIX = "lightrans-notifier-";
 const STYLE_PATH = "content/display/library/notifier/notification.css";
 // the animation duration in CSS file
 const ANIMATION_DURATION = 400;

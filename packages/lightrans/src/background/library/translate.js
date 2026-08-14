@@ -2,7 +2,6 @@ import { AITranslator } from "@lightrans/translators";
 import { log } from "common/scripts/common.js";
 import { promiseTabs, delayPromise } from "common/scripts/promise.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
-import LocalTTS from "./local_tts.js";
 
 class TranslatorManager {
     /**
@@ -59,16 +58,6 @@ class TranslatorManager {
             // 在配置加载完成后更新菜单
             this.updateTranslatePageMenu();
         });
-
-        /**
-         * Default TTS speed.
-         */
-        this.TTS_SPEED = "fast";
-
-        /**
-         * Local TTS service.
-         */
-        this.localTTS = new LocalTTS();
 
         /**
          * Start to provide services and listen to event.
@@ -132,20 +121,6 @@ class TranslatorManager {
             return this.translate(params.text, params.position);
         });
 
-        // Pronounce service.
-        this.channel.provide("pronounce", async (params) => {
-            // Ensure that configurations have been initialized.
-            await this.config_loader;
-            
-            let speed = params.speed;
-            if (!speed) {
-                speed = this.TTS_SPEED;
-                this.TTS_SPEED = speed === "fast" ? "slow" : "fast";
-            }
-
-            return this.pronounce(params.pronouncing, params.text, params.language, speed);
-        });
-
         // Get available AI models service.
         this.channel.provide("get_available_ai_models", () =>
             Promise.resolve(this.getAvailableAIModels())
@@ -165,9 +140,6 @@ class TranslatorManager {
      * This should be called for only once!
      */
     listenToEvents() {
-        // Result frame closed event.
-        this.channel.on("frame_closed", this.stopPronounce.bind(this));
-
         /**
          * Update config cache on config changed.
          */
@@ -386,77 +358,6 @@ class TranslatorManager {
     }
 
     /**
-     * Text to speech proxy.
-     *
-     * @param {String} pronouncing which text are we pronouncing? enum{source, target}
-     * @param {String} text The text.
-     * @param {String} language The language of the text.
-     * @param {String} speed The speed of the speech.
-     *
-     * @returns {Promise<void>} pronounce finished Promise
-     */
-    async pronounce(pronouncing, text, language, speed) {
-        // Ensure that configurations have been initialized.
-        await this.config_loader;
-
-        // get current tab id
-        const currentTabId = await this.getCurrentTabId();
-        if (currentTabId === -1) return;
-
-        let lang = language;
-        let timestamp = new Date().getTime();
-
-        // Inform current tab pronouncing started.
-        this.channel.emitToTabs(currentTabId, "start_pronouncing", {
-            pronouncing,
-            text,
-            language,
-            timestamp,
-        });
-
-        try {
-            if (language === "auto") {
-                lang = await this.AI_TRANSLATOR.detect(text);
-            }
-
-            await this.AI_TRANSLATOR.pronounce(text, lang, speed).catch(
-                ((error) => {
-                    // API pronouncing failed, try local TTS service.
-                    if (!this.localTTS.speak(text, lang, speed)) {
-                        throw error;
-                    }
-                }).bind(this)
-            );
-
-            // Inform current tab pronouncing finished.
-            this.channel.emitToTabs(currentTabId, "pronouncing_finished", {
-                pronouncing,
-                text,
-                language,
-                timestamp,
-            });
-        } catch (error) {
-            // Inform current tab pronouncing failed.
-            this.channel.emitToTabs(currentTabId, "pronouncing_error", {
-                pronouncing,
-                error,
-                timestamp,
-            });
-        }
-    }
-
-    /**
-     * Stop pronounce proxy.
-     */
-    async stopPronounce() {
-        // Ensure that configurations have been initialized.
-        await this.config_loader;
-
-        this.AI_TRANSLATOR.stopPronounce();
-        this.localTTS.pause();
-    }
-
-    /**
      * Get available AI models.
      *
      * @returns {Array<string>} available AI models.
@@ -613,7 +514,7 @@ function translatePage(channel, model) {
                     const insertedSpans = [];
                     
                     // 存储原始文本内容，用于翻译和恢复
-                    window.edgeTranslateOriginalTextNodes = [];
+                    window.lightransOriginalTextNodes = [];
                     
                     // 获取网页中所有文本节点
                     function getAllTextNodes(root) {
@@ -632,7 +533,7 @@ function translatePage(channel, model) {
                             while ((node = walker.nextNode())) {
                                 textNodes.push(node);
                                 // 存储原始文本内容
-                                window.edgeTranslateOriginalTextNodes.push({
+                                window.lightransOriginalTextNodes.push({
                                     node: node,
                                     originalText: node.nodeValue
                                 });
@@ -687,8 +588,8 @@ function translatePage(channel, model) {
                             const textIndex = textIndices[index];
                             if (textIndex >= 0 && translatedTexts[textIndex]) {
                                 // 始终缓存译文，供后续切换显示模式使用
-                                if (window.edgeTranslateOriginalTextNodes && window.edgeTranslateOriginalTextNodes[index]) {
-                                    window.edgeTranslateOriginalTextNodes[index].translatedText = translatedTexts[textIndex];
+                                if (window.lightransOriginalTextNodes && window.lightransOriginalTextNodes[index]) {
+                                    window.lightransOriginalTextNodes[index].translatedText = translatedTexts[textIndex];
                                 }
                                 // 仅在「译文」模式下就地替换文本节点
                                 if (pageMode === 'translated' && node.nodeValue !== translatedTexts[textIndex]) {
@@ -794,7 +695,7 @@ function translatePage(channel, model) {
 
                     // 根据显示模式渲染页面：原文 / 译文 / 对照
                     function applyMode(mode) {
-                        const originals = window.edgeTranslateOriginalTextNodes || [];
+                        const originals = window.lightransOriginalTextNodes || [];
                         // 先清除已插入的对照译文 span
                         insertedSpans.forEach((sp) => {
                             if (sp.parentNode) sp.parentNode.removeChild(sp);
