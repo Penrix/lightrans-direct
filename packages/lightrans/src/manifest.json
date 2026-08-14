@@ -1,7 +1,7 @@
 {
     "name": "__MSG_AppName__",
     "description": "__MSG_Description__",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "default_locale": "en",
     "background": {
         "service_worker": "./background/background.js"
@@ -70,10 +70,8 @@
         "128": "icon/icon128.png"
     },
     "permissions": [
-        "notifications",
         "contextMenus",
         "storage",
-        "cookies",
         "tabs",
         "activeTab",
         "scripting"
