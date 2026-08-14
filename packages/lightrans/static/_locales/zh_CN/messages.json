@@ -1,10 +1,10 @@
 {
     "AppName": {
-        "message": "lightrans",
+        "message": "轻量翻译",
         "description": "应用名称"
     },
     "Description": {
-        "message": "轻量翻译",
+        "message": "轻量翻译（lightrans）是一款由 AI 驱动的轻量级浏览器文字翻译扩展。",
         "description": "这是一个轻量翻译插件"
     },
     "ChangeLanguageSetting": {

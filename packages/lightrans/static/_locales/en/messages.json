@@ -4,7 +4,7 @@
         "description": "App Name"
     },
     "Description": {
-        "message": "this is a Lightweight Translater",
+        "message": "lightrans is a lightweight, AI-driven browser extension for text translation.",
         "description": "App Description"
     },
     "ChangeLanguageSetting": {

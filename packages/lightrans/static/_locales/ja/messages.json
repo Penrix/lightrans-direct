@@ -4,7 +4,7 @@
         "description": "アプリケーション名"
     },
     "Description": {
-        "message": "あなたが望むものを翻訳します",
+        "message": "lightrans は、AI を活用した軽量なブラウザ用テキスト翻訳拡張機能です。",
         "description": "アプリケーションの説明"
     },
     "ChangeLanguageSetting": {
