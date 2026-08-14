@@ -30,7 +30,7 @@ if (chrome.contextMenus) {
         chrome.contextMenus.create({
             id: "settings",
             title: chrome.i18n.getMessage("Settings"),
-            contexts: ["browser_action"],
+            contexts: ["action"],
         });
     }
 
@@ -38,14 +38,14 @@ if (chrome.contextMenus) {
     chrome.contextMenus.create({
         id: "shortcut",
         title: chrome.i18n.getMessage("ShortcutSetting"),
-        contexts: ["browser_action"],
+        contexts: ["action"],
     });
 
     // 创建黑名单相关菜单
     chrome.contextMenus.create({
         id: "add_url_blacklist",
         title: chrome.i18n.getMessage("AddUrlBlacklist"),
-        contexts: ["browser_action"],
+        contexts: ["action"],
         enabled: false,
         visible: false,
     });
@@ -53,7 +53,7 @@ if (chrome.contextMenus) {
     chrome.contextMenus.create({
         id: "add_domain_blacklist",
         title: chrome.i18n.getMessage("AddDomainBlacklist"),
-        contexts: ["browser_action"],
+        contexts: ["action"],
         enabled: false,
         visible: false,
     });
@@ -61,7 +61,7 @@ if (chrome.contextMenus) {
     chrome.contextMenus.create({
         id: "remove_url_blacklist",
         title: chrome.i18n.getMessage("RemoveUrlBlacklist"),
-        contexts: ["browser_action"],
+        contexts: ["action"],
         enabled: false,
         visible: false,
     });
@@ -69,7 +69,7 @@ if (chrome.contextMenus) {
     chrome.contextMenus.create({
         id: "remove_domain_blacklist",
         title: chrome.i18n.getMessage("RemoveDomainBlacklist"),
-        contexts: ["browser_action"],
+        contexts: ["action"],
         enabled: false,
         visible: false,
     });

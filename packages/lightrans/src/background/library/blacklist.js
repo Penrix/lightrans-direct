@@ -9,6 +9,9 @@ export {
     updateBLackListMenu,
 };
 
+// MV3 下 chrome.browserAction 已移除，回退到 chrome.action；同时兼容 Firefox MV2 的 browserAction
+const action = chrome.action || chrome.browserAction;
+
 const DISABLED_MARK = "X";
 
 /**
@@ -22,7 +25,7 @@ function addUrlBlacklist() {
     });
 
     // change the badge text when add url to blacklist
-    chrome.browserAction.setBadgeText({ text: DISABLED_MARK });
+    action.setBadgeText({ text: DISABLED_MARK });
 }
 
 /**
@@ -36,7 +39,7 @@ function removeUrlBlacklist() {
     });
 
     // clear the badge text when remove url from blacklist
-    chrome.browserAction.setBadgeText({ text: "" });
+    action.setBadgeText({ text: "" });
 }
 
 /**
@@ -50,7 +53,7 @@ function addDomainBlacklist() {
     });
 
     // change the badge text when add domain to blacklist
-    chrome.browserAction.setBadgeText({ text: DISABLED_MARK });
+    action.setBadgeText({ text: DISABLED_MARK });
 }
 
 /**
@@ -69,7 +72,7 @@ function removeDomainBlacklist() {
             enableItems(["add_url_blacklist", "add_domain_blacklist"]);
 
             // clear the badge text when remove domain from blacklist
-            chrome.browserAction.setBadgeText({ text: "" });
+            action.setBadgeText({ text: "" });
         }
     });
 }
@@ -131,21 +134,21 @@ function updateBLackListMenu(url) {
             enableItems(["remove_domain_blacklist"]);
 
             // the domain is in the blacklist and update the badge text
-            chrome.browserAction.setBadgeText({ text: DISABLED_MARK });
+            action.setBadgeText({ text: DISABLED_MARK });
         } else if (result.blacklist.urls[url]) {
             disableItems(["add_url_blacklist", "add_domain_blacklist", "remove_domain_blacklist"]);
 
             enableItems(["remove_url_blacklist"]);
 
             // the url is in the blacklist and update the badge text
-            chrome.browserAction.setBadgeText({ text: DISABLED_MARK });
+            action.setBadgeText({ text: DISABLED_MARK });
         } else {
             disableItems(["remove_url_blacklist", "remove_domain_blacklist"]);
 
             enableItems(["add_url_blacklist", "add_domain_blacklist"]);
 
             // the url and domain is not in the blacklist and clear the badge text
-            chrome.browserAction.setBadgeText({ text: "" });
+            action.setBadgeText({ text: "" });
         }
     });
 }

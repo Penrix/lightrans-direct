@@ -1,16 +1,6 @@
 {
-    "background": {
-        "persistent": true
-    },
-    "permissions": [
-        "notifications",
-        "contextMenus",
-        "storage",
-        "cookies",
-        "tabs",
-        "<all_urls>",
-        "webRequest",
-        "webRequestBlocking"
+    "host_permissions": [
+        "<all_urls>"
     ],
     "content_scripts": [
         {
@@ -34,7 +24,8 @@
             "all_frames": true
         }
     ],
-    "content_security_policy": "script-src 'self' 'unsafe-eval' chrome-extension://hfjbmagddngcpeloejdejnfgbamkjaeg/ chrome-extension://aibcglbfblnogfjhbcmmpobjhnomhcdo/; object-src 'self'",
-    "minimum_chrome_version": "55",
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
+    },
     "homepage_url": "https://github.com/W4J1e/Lightrans"
 }

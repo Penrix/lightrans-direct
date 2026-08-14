@@ -505,7 +505,7 @@ class TranslatorManager {
                         chrome.contextMenus.create({
                             id: "settings",
                             title: chrome.i18n.getMessage("Settings"),
-                            contexts: ["browser_action"],
+                            contexts: ["action"],
                         });
                     }
 
@@ -513,14 +513,14 @@ class TranslatorManager {
                     chrome.contextMenus.create({
                         id: "shortcut",
                         title: chrome.i18n.getMessage("ShortcutSetting"),
-                        contexts: ["browser_action"],
+                        contexts: ["action"],
                     });
 
                     // 创建黑名单相关菜单
                     chrome.contextMenus.create({
                         id: "add_url_blacklist",
                         title: chrome.i18n.getMessage("AddUrlBlacklist"),
-                        contexts: ["browser_action"],
+                        contexts: ["action"],
                         enabled: false,
                         visible: false,
                     });
@@ -528,7 +528,7 @@ class TranslatorManager {
                     chrome.contextMenus.create({
                         id: "add_domain_blacklist",
                         title: chrome.i18n.getMessage("AddDomainBlacklist"),
-                        contexts: ["browser_action"],
+                        contexts: ["action"],
                         enabled: false,
                         visible: false,
                     });
@@ -536,7 +536,7 @@ class TranslatorManager {
                     chrome.contextMenus.create({
                         id: "remove_url_blacklist",
                         title: chrome.i18n.getMessage("RemoveUrlBlacklist"),
-                        contexts: ["browser_action"],
+                        contexts: ["action"],
                         enabled: false,
                         visible: false,
                     });
@@ -544,7 +544,7 @@ class TranslatorManager {
                     chrome.contextMenus.create({
                         id: "remove_domain_blacklist",
                         title: chrome.i18n.getMessage("RemoveDomainBlacklist"),
-                        contexts: ["browser_action"],
+                        contexts: ["action"],
                         enabled: false,
                         visible: false,
                     });
@@ -593,17 +593,15 @@ function translatePage(channel, model) {
         // 注入网页翻译脚本，使用Function构造函数安全传递参数
         const modelParam = model || "default";
         
-        // 使用chrome.tabs.executeScript注入脚本，避免模板字符串安全问题
-        chrome.tabs.executeScript(tabId, {
-            code: `
-                    (function() {
-                        console.log('lightrans: Page translate script injected');
+        // 使用 chrome.scripting.executeScript 注入脚本（MV3 已移除 chrome.tabs.executeScript）
+        // 把原内联脚本重构成可序列化的函数，通过 args 传入 pageMode 与 model
+        const injectPageTranslate = (pageMode, model) => {
+            console.log('lightrans: Page translate script injected');
 
-                        // 页面翻译显示模式：original(原文) / translated(译文) / bilingual(对照)
-                        const pageMode = '${pageModeParam}';
+            // 页面翻译显示模式：original(原文) / translated(译文) / bilingual(对照)
 
-                        // 检查document.body是否存在
-                    if (!document.body) {
+            // 检查document.body是否存在
+            if (!document.body) {
                         console.error('lightrans: document.body is not available');
                         return;
                     }
@@ -737,7 +735,7 @@ function translatePage(channel, model) {
                                 indices: textIndices,
                                 index: index
                             },
-                            model: '${modelParam}'
+                            model: model
                         }, (response) => {
                             console.log('lightrans: Translation response received for index', index);
                             
@@ -898,9 +896,11 @@ function translatePage(channel, model) {
                     if (allTexts.length === 0 && bannerTitleEl) {
                         bannerTitleEl.textContent = 'Lightrans 已翻译此页';
                     }
-                })();
-            `
-        }, (result) => {
+            };
+
+            chrome.scripting.executeScript(
+                { target: { tabId }, func: injectPageTranslate, args: [pageModeParam, modelParam] },
+                (result) => {
             if (chrome.runtime.lastError) {
                 log(`Chrome runtime error: ${chrome.runtime.lastError}`);
                 log(`Detail: ${result}`);
