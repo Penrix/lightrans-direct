@@ -569,15 +569,82 @@ function translatePage(channel, model) {
                     
                     console.log('lightrans: Total texts to translate:', allTexts.length);
                     
-                    // 并行翻译参数设置
-                    const maxBatchSize = 500; // 每批次最多500个字符
-                    const maxParallelBatches = 3; // 最多并行3个批次
+                    // ===== 翻译调度参数 =====
+                    // 短文本阈值：不超过该字符数且无换行的文本（菜单项、按钮、链接等）参与批量合并
+                    const SHORT_TEXT_LIMIT = 120;
+                    // 每批最多合并的短文本条数
+                    const BATCH_MAX_COUNT = 25;
+                    // 每批合并后的总字符上限（控制输出规模，避免译文被 max_tokens 截断）
+                    const BATCH_MAX_CHARS = 1000;
+                    // 自适应并发：初始 / 上限 / 下限。初始保守起步（免费中继共享配额，
+                    // 瞬时 8 并发批量易打满 TPM，上游限流会被中继透传成 502），
+                    // 持续成功后自动爬升到上限；配额升级后可适当调高初始值。
+                    const INITIAL_PARALLEL = 4;
+                    const MAX_PARALLEL = 10;
+                    const MIN_PARALLEL = 1;
+                    // 连续成功多少个批次后并发 +1（恢复探测）
+                    const SUCCESS_STREAK_TO_RECOVER = 15;
+                    // 限流退避：起始 1s 指数增长，上限 30s；单批退避重排超过该次数则放弃（保留原文）
+                    const BACKOFF_BASE_MS = 1000;
+                    const BACKOFF_MAX_MS = 30000;
+                    const MAX_RATE_LIMIT_RETRIES = 8;
+
                     const translatedTexts = new Array(allTexts.length);
                     let totalTranslated = 0;
                     let totalReplaced = 0;
-                    let batchesSent = 0;
-                    let batchesCompleted = 0;
-                    const totalBatches = Math.ceil(allTexts.length / maxBatchSize);
+
+                    // ===== 视口优先：首屏文本先翻译，视口外（长页面尾部）后翻译 =====
+                    const textInViewport = new Array(allTexts.length).fill(false);
+                    textNodes.forEach((node, index) => {
+                        const textIndex = textIndices[index];
+                        if (textIndex >= 0 && !textInViewport[textIndex] && node.parentElement) {
+                            const rect = node.parentElement.getBoundingClientRect();
+                            if (rect.top < window.innerHeight && rect.bottom > 0) {
+                                textInViewport[textIndex] = true;
+                            }
+                        }
+                    });
+                    const sendOrder = [];
+                    for (let i = 0; i < allTexts.length; i++) {
+                        if (textInViewport[i]) sendOrder.push(i);
+                    }
+                    for (let i = 0; i < allTexts.length; i++) {
+                        if (!textInViewport[i]) sendOrder.push(i);
+                    }
+
+                    // ===== 任务打包：按发送顺序把连续短文本合并为批量任务（一次请求），长文本独立成任务 =====
+                    const tasks = [];
+                    let currentBatch = [];
+                    let currentBatchChars = 0;
+
+                    function flushBatch() {
+                        if (currentBatch.length > 0) {
+                            tasks.push({ indices: currentBatch, rateLimitRetries: 0 });
+                            currentBatch = [];
+                            currentBatchChars = 0;
+                        }
+                    }
+
+                    sendOrder.forEach((textIndex) => {
+                        const text = allTexts[textIndex];
+                        const trimmed = text.trim();
+                        const isShort = trimmed.length <= SHORT_TEXT_LIMIT && !/\n/.test(trimmed);
+                        if (isShort) {
+                            // 达到条数或字符上限时先落批
+                            if (currentBatch.length >= BATCH_MAX_COUNT || currentBatchChars + text.length > BATCH_MAX_CHARS) {
+                                flushBatch();
+                            }
+                            currentBatch.push(textIndex);
+                            currentBatchChars += text.length;
+                        } else {
+                            // 长文本独立成任务，不打断也不并入当前批
+                            flushBatch();
+                            tasks.push({ indices: [textIndex], rateLimitRetries: 0 });
+                        }
+                    });
+                    flushBatch();
+
+                    console.log('lightrans: Packed', allTexts.length, 'texts into', tasks.length, 'tasks (viewport first:', textInViewport.filter(Boolean).length, 'texts)');
                     
                     // 替换已翻译的文本节点
                     function replaceTranslatedNodes() {
@@ -605,93 +672,127 @@ function translatePage(channel, model) {
                         }
                     }
                     
-                    // 处理单个文本翻译结果
-                    function handleTranslationResult(index, translatedText) {
-                        translatedTexts[index] = translatedText;
-                        totalTranslated++;
-                        batchesCompleted++;
-                        
-                        // 每翻译10个文本替换一次，平衡性能和用户体验
-                        if (totalTranslated % 10 === 0 || totalTranslated === allTexts.length) {
-                            replaceTranslatedNodes();
+                    // ===== 自适应并发调度器 =====
+                    let pendingTasks = tasks.slice();
+                    let inFlight = 0;
+                    let currentParallel = INITIAL_PARALLEL;
+                    let successStreak = 0;
+                    let backoffMs = BACKOFF_BASE_MS;
+                    let backoffUntil = 0;
+
+                    function pump() {
+                        if (Date.now() < backoffUntil || pendingTasks.length === 0) return;
+                        while (inFlight < currentParallel && pendingTasks.length > 0) {
+                            const task = pendingTasks.shift();
+                            inFlight++;
+                            sendBatchRequest(task);
                         }
-                        
-                        // 继续发送新的请求
-                        sendParallelRequests();
-                        
-                        // 检查是否所有文本都已翻译完成
-                        if (totalTranslated === allTexts.length) {
+                    }
+
+                    // 限流：并发减半 + 指数退避，期间 pump 不再发新请求
+                    function enterBackoff() {
+                        backoffUntil = Date.now() + backoffMs;
+                        backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);
+                        currentParallel = Math.max(MIN_PARALLEL, Math.floor(currentParallel / 2));
+                        successStreak = 0;
+                    }
+
+                    // 持续成功：逐步恢复并发并重置退避时长
+                    function onBatchSuccess() {
+                        successStreak++;
+                        if (successStreak >= SUCCESS_STREAK_TO_RECOVER && currentParallel < MAX_PARALLEL) {
+                            currentParallel++;
+                            successStreak = 0;
+                        }
+                        backoffMs = BACKOFF_BASE_MS;
+                    }
+
+                    function finishTask() {
+                        // 批量模式下任务数远少于文本数，每任务渲染一次即可
+                        replaceTranslatedNodes();
+                        if (totalTranslated >= allTexts.length) {
                             console.log('lightrans: All texts translated, total replaced:', totalReplaced, 'nodes');
                             if (bannerTitleEl) bannerTitleEl.textContent = 'Lightrans 已翻译此页';
                             applyMode(pageMode);
                         }
                     }
-                    
-                    // 发送翻译请求
-                    function sendTranslationRequest(text, index) {
+
+                    // 处理一批翻译结果：按任务内的索引一一回填
+                    function handleTranslationResult(task, translatedBatch) {
+                        task.indices.forEach((textIndex, i) => {
+                            translatedTexts[textIndex] = translatedBatch[i];
+                        });
+                        totalTranslated += task.indices.length;
+                        finishTask();
+                    }
+
+                    // 兜底：重试耗尽或异常时保留原文并推进进度，避免整体卡死
+                    function handleTranslationFallback(task) {
+                        task.indices.forEach((textIndex) => {
+                            if (translatedTexts[textIndex] == null) {
+                                translatedTexts[textIndex] = allTexts[textIndex];
+                            }
+                        });
+                        totalTranslated += task.indices.length;
+                        finishTask();
+                    }
+
+                    // 发送一批翻译请求（单个长文本或合并的短文本批）
+                    function sendBatchRequest(task) {
+                        const texts = task.indices.map(i => allTexts[i]);
                         chrome.runtime.sendMessage({
                             type: 'TRANSLATE_PAGE_CONTENT',
                             content: {
-                                texts: [text],
-                                indices: textIndices,
-                                index: index
+                                texts: texts
                             },
                             model: model
                         }, (response) => {
-                            console.log('lightrans: Translation response received for index', index);
-                            
-                            if (response && response.translatedContent) {
-                                console.log('lightrans: Translation content received for index', index);
-                                
-                                try {
-                                    // 直接使用翻译结果，无需JSON.parse
-                                    const translatedText = response.translatedContent.texts[0];
-                                    
-                                    // 处理翻译结果
-                                    handleTranslationResult(index, translatedText);
-                                } catch (error) {
-                                    console.error('lightrans: Error processing translation result for index', index, ':', error);
-                                    // 翻译失败时保留原文
-                                    handleTranslationResult(index, text);
-                                }
-                            } else if (response && response.error) {
-                                console.error('lightrans: Translation error for index', index, ':', response.error);
-                                // 翻译失败时保留原文
-                                handleTranslationResult(index, text);
-                            } else {
-                                console.error('lightrans: No translated content in response for index', index);
-                                // 翻译失败时保留原文
-                                handleTranslationResult(index, text);
+                            inFlight--;
+
+                            if (chrome.runtime.lastError) {
+                                console.error('lightrans: sendMessage error:', chrome.runtime.lastError);
+                                handleTranslationFallback(task);
+                                pump();
+                                return;
                             }
+
+                            if (response && response.rateLimited) {
+                                task.rateLimitRetries++;
+                                if (task.rateLimitRetries > MAX_RATE_LIMIT_RETRIES) {
+                                    console.warn('lightrans: Batch rate-limited too many times, keeping original text');
+                                    handleTranslationFallback(task);
+                                } else {
+                                    console.warn('lightrans: Rate limited, backing off', backoffMs, 'ms (parallel:', currentParallel, ')');
+                                    enterBackoff();
+                                    pendingTasks.unshift(task); // 本批重新排队，退避结束后重发
+                                }
+                                pump();
+                                return;
+                            }
+
+                            if (response && response.translatedContent && response.translatedContent.texts) {
+                                onBatchSuccess();
+                                handleTranslationResult(task, response.translatedContent.texts);
+                            } else {
+                                console.error('lightrans: Translation failed for batch, keeping original text', response && response.error);
+                                handleTranslationFallback(task);
+                            }
+                            pump();
                         });
                     }
-                    
-                    // 并行发送翻译请求
-                    function sendParallelRequests() {
-                        // 发送最多maxParallelBatches个请求
-                        while (batchesSent < allTexts.length && batchesSent < batchesCompleted + maxParallelBatches) {
-                            const text = allTexts[batchesSent];
-                            const index = batchesSent;
-                            
-                            console.log('lightrans: Sending translation request for index', index, ':', text.length, 'characters');
-                            sendTranslationRequest(text, index);
-                            
-                            batchesSent++;
-                        }
-                    }
-                    
-                    // 开始并行翻译
-                    console.log('lightrans: Starting parallel translation, total texts:', allTexts.length);
-                    sendParallelRequests();
-                    
-                    // 每500毫秒检查一次，继续发送请求
+
+                    // 开始调度
+                    console.log('lightrans: Starting scheduled translation, total texts:', allTexts.length);
+                    pump();
+
+                    // 定时兜底驱动：覆盖退避到期后无事件触发的场景
                     const interval = setInterval(() => {
-                        if (batchesSent < allTexts.length) {
-                            sendParallelRequests();
-                        } else {
+                        if (totalTranslated >= allTexts.length) {
                             clearInterval(interval);
+                            return;
                         }
-                    }, 500);
+                        pump();
+                    }, 300);
 
                     // 根据显示模式渲染页面：原文 / 译文 / 对照
                     function applyMode(mode) {

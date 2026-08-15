@@ -63,6 +63,70 @@ class AITranslator {
     }
 
     /**
+     * 单条翻译与批量翻译共用的底层请求方法（free / custom 两种模式）。
+     *
+     * @param from source language
+     * @param to target language
+     * @param text user 消息内容（批量为编号合并后的文本）
+     * @param maxTokens 生成上限（批量时按输入长度动态估算，避免译文被截断）
+     * @param batch 是否批量模式（决定 system prompt；免费模式下中继自行构造 prompt，此参数仅影响自定义模式）
+     *
+     * @returns Promise of translated text
+     */
+    private async requestTranslate(from: string, to: string, text: string, maxTokens: number, batch = false): Promise<string> {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+
+        // 发送前兜底：currentModel 为空或被污染时，回退到安全模型，避免把空/非法模型名发到
+        // 中继（免费模式）或官方端点（自定义模式）导致 502 / 上游报错。
+        const safeModel = this.getSafeModel();
+
+        // 批量模式要求模型保留 <N> 编号标记，逐段返回译文；单条模式与原行为一致。
+        const systemPrompt = batch
+            ? `You are a professional translator. Translate each numbered text segment (delimited by tags like <1>, <2>) from ${from} to ${to}. Keep exactly the same tag format in your output, one translated segment per tag. Do not merge, split, add or remove any segments. Return only the tagged translations.`
+            : `You are a professional translator. Translate the following text from ${from} to ${to}. Only return the translated text, no other content.`;
+
+        if (this.serviceMode === "custom") {
+            // 硅基流动（自定义）：直连官方端点，使用用户自有 API Key 鉴权。
+            if (!this.apiKey) {
+                throw new Error("自定义模式需要填写 SiliconFlow API Key");
+            }
+            const endpoint = AITranslator.SILICONFLOW_ENDPOINT;
+            headers["Authorization"] = `Bearer ${this.apiKey}`;
+
+            // 与中继服务保持一致的请求结构，保证两种模式翻译质量一致
+            const response = await axios.post(endpoint, {
+                model: safeModel,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: text }
+                ],
+                temperature: 0.3,
+                max_tokens: maxTokens,
+                // 仅 Qwen 系列关闭思考模式（与中继服务保持一致）
+                enable_thinking: this.currentModel.startsWith("Qwen/") ? false : undefined
+            }, { headers });
+
+            return (response.data?.choices?.[0]?.message?.content || "").toString().trim();
+        }
+
+        // 硅基流动（免费）：走我们自己部署的 API 反代服务，内置共享令牌，SiliconFlow Key 不进扩展。
+        const endpoint = this.OFFICIAL_RELAY_ENDPOINT;
+        headers["X-Lightrans-Token"] = this.RELAY_TOKEN;
+
+        const response = await axios.post(endpoint, {
+            text,
+            from,
+            to,
+            model: safeModel
+        }, { headers });
+
+        // 中继返回 { translatedText }
+        return (response.data?.translatedText || "").toString().trim();
+    }
+
+    /**
      * Translate text using AItrans with specified model.
      *
      * @param text text to translate
@@ -73,64 +137,7 @@ class AITranslator {
      */
     async translate(text: string, from: string, to: string): Promise<TranslationResult> {
         try {
-            const headers: Record<string, string> = {
-                "Content-Type": "application/json",
-            };
-
-            // 发送前兜底：currentModel 为空或被污染时，回退到安全模型，避免把空/非法模型名发到
-            // 中继（免费模式）或官方端点（自定义模式）导致 502 / 上游报错。
-            const safeModel = this.getSafeModel();
-
-            if (this.serviceMode === "custom") {
-                // 硅基流动（自定义）：直连官方端点，使用用户自有 API Key 鉴权。
-                if (!this.apiKey) {
-                    throw new Error("自定义模式需要填写 SiliconFlow API Key");
-                }
-                const endpoint = AITranslator.SILICONFLOW_ENDPOINT;
-                headers["Authorization"] = `Bearer ${this.apiKey}`;
-
-                // 与中继服务保持一致的请求结构，保证两种模式翻译质量一致
-                const response = await axios.post(endpoint, {
-                    model: safeModel,
-                    messages: [
-                        {
-                            role: "system",
-                            content: `You are a professional translator. Translate the following text from ${from} to ${to}. Only return the translated text, no other content.`
-                        },
-                        { role: "user", content: text }
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 1024,
-                    // 仅 Qwen 系列关闭思考模式（与中继服务保持一致）
-                    enable_thinking: this.currentModel.startsWith("Qwen/") ? false : undefined
-                }, { headers });
-
-                const translatedText = (response.data?.choices?.[0]?.message?.content || "").toString().trim();
-
-                return {
-                    originalText: text,
-                    mainMeaning: translatedText,
-                    tPronunciation: "",
-                    sPronunciation: "",
-                    detailedMeanings: [],
-                    definitions: [],
-                    examples: []
-                };
-            }
-
-            // 硅基流动（免费）：走我们自己部署的 API 反代服务，内置共享令牌，SiliconFlow Key 不进扩展。
-            const endpoint = this.OFFICIAL_RELAY_ENDPOINT;
-            headers["X-Lightrans-Token"] = this.RELAY_TOKEN;
-
-            const response = await axios.post(endpoint, {
-                text,
-                from,
-                to,
-                model: safeModel
-            }, { headers });
-
-            // 中继返回 { translatedText }
-            const translatedText = (response.data?.translatedText || "").toString().trim();
+            const translatedText = await this.requestTranslate(from, to, text, 1024);
 
             return {
                 originalText: text,
@@ -143,8 +150,214 @@ class AITranslator {
             };
         } catch (error) {
             console.error("AItrans translation error:", error);
-            throw new Error("AItrans translation failed");
+            throw AITranslator.normalizeError(error);
         }
+    }
+
+    /**
+     * 批量翻译多条短文本（如导航菜单、按钮、链接文字）。
+     *
+     * 将多条文本用 <N> 编号分隔符合并为一次请求，大幅减少请求次数（RPM 占用），
+     * 返回后按编号解析拆回；解析失败或请求失败时自动降级为逐条翻译，保证结果完整。
+     *
+     * 错误策略：
+     * - 瞬时错误（限流 429 / 网关 5xx / 网络抖动）→ 直接上抛，调用方退避后重试整批。
+     *   此时整批尚无产出，重试无损；且绝不降级为逐条——那会把 1 个请求放大成 N 个，加剧限流。
+     * - 非瞬时错误（内容审核等）→ 降级逐条（单条可能因批量格式问题失败而单条能过）。
+     *
+     * @param texts 待翻译文本数组
+     * @param from source language
+     * @param to target language
+     *
+     * @returns Promise，与输入等长的译文数组（失败项保留原文）
+     */
+    async translateBatch(texts: string[], from: string, to: string): Promise<string[]> {
+        if (texts.length === 0) return [];
+
+        if (texts.length === 1) {
+            try {
+                const result = await this.translate(texts[0], from, to);
+                return [result.mainMeaning];
+            } catch (error) {
+                // 瞬时错误上抛，交由调用方退避重试；其他错误保留原文
+                if (AITranslator.isTransientError(error)) {
+                    throw AITranslator.transientError(error);
+                }
+                console.error("AItrans single translation error:", error);
+                return [texts[0]];
+            }
+        }
+
+        const merged = texts.map((text, index) => `<${index + 1}> ${text}`).join("\n");
+
+        let parsed: (string | null)[] | null = null;
+        try {
+            const maxTokens = AITranslator.estimateMaxTokens(merged.length);
+            const response = await this.requestTranslate(from, to, merged, maxTokens, true);
+            parsed = AITranslator.parseNumberedResult(response, texts.length);
+        } catch (error) {
+            if (AITranslator.isTransientError(error)) {
+                throw AITranslator.transientError(error);
+            }
+            console.error("AItrans batch translation error:", error);
+        }
+
+        // 完全解析失败（模型未按编号格式返回）或非瞬时请求失败 → 逐条降级
+        if (!parsed) {
+            console.warn("AItrans batch unavailable, falling back to single translation");
+            return await this.translateOneByOne(texts, from, to);
+        }
+
+        // 个别片段缺失 → 仅对缺失项逐条补翻
+        const results: string[] = [];
+        for (let i = 0; i < texts.length; i++) {
+            if (parsed[i] !== null) {
+                results.push(parsed[i] as string);
+                continue;
+            }
+            try {
+                const single = await this.translate(texts[i], from, to);
+                results.push(single.mainMeaning);
+            } catch (error) {
+                console.error(`AItrans batch segment ${i + 1} translation error:`, error);
+                results.push(texts[i]);
+            }
+        }
+        return results;
+    }
+
+    /**
+     * 逐条翻译兜底：单条失败重试一次，仍失败则保留原文。
+     *
+     * @param texts 待翻译文本数组
+     * @param from source language
+     * @param to target language
+     *
+     * @returns Promise，与输入等长的译文数组
+     */
+    private async translateOneByOne(texts: string[], from: string, to: string): Promise<string[]> {
+        const results: string[] = [];
+        for (const text of texts) {
+            let translated = text;
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const result = await this.translate(text, from, to);
+                    translated = result.mainMeaning;
+                    break;
+                } catch (error) {
+                    console.error(`AItrans fallback translation error (attempt ${attempt + 1}):`, error);
+                    if (attempt === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 800));
+                    }
+                }
+            }
+            results.push(translated);
+        }
+        return results;
+    }
+
+    /**
+     * 解析模型按编号格式返回的批量译文。
+     *
+     * @param result 模型返回的原始文本
+     * @param count 批量条数
+     *
+     * @returns 与批量等长的数组（缺失段为 null）；一段都没匹配上时返回 null 表示整体解析失败
+     */
+    private static parseNumberedResult(result: string, count: number): (string | null)[] | null {
+        if (!result) return null;
+        const segments: (string | null)[] = new Array(count).fill(null);
+        const regex = /<(\d{1,3})>\s*([\s\S]*?)(?=\n\s*<\d{1,3}>|$)/g;
+        let match: RegExpExecArray | null;
+        let matched = 0;
+        while ((match = regex.exec(result))) {
+            const index = parseInt(match[1], 10);
+            const text = match[2].trim();
+            if (index >= 1 && index <= count && segments[index - 1] === null && text) {
+                segments[index - 1] = text;
+                matched++;
+            }
+        }
+        if (matched === 0) return null;
+        return segments;
+    }
+
+    /**
+     * 按输入长度估算批量请求的 max_tokens，避免合并后译文被截断。
+     *
+     * 译文长度通常与原文量级相当：按 1 token ≈ 2 字符保守估算，
+     * 再留出系统提示与编号格式的开销；下限 1024（与单条一致），上限 4096。
+     *
+     * @param inputChars 合并后文本的字符数
+     *
+     * @returns max_tokens 值
+     */
+    private static estimateMaxTokens(inputChars: number): number {
+        const estimated = Math.ceil(inputChars / 2) + 256;
+        return Math.min(Math.max(estimated, 1024), 4096);
+    }
+
+    /**
+     * 判断错误是否为限流（429）。
+     *
+     * @param error 捕获的错误
+     *
+     * @returns 是否限流
+     */
+    private static isRateLimitError(error: unknown): boolean {
+        const err = error as { response?: { status?: number }, message?: string };
+        if (err?.response?.status === 429) return true;
+        const message = String(err?.message || err || "");
+        return /429|rate\s*limit/i.test(message);
+    }
+
+    /**
+     * 判断错误是否为瞬时错误（限流 / 网关 / 网络抖动），值得退避后重试。
+     *
+     * 背景：免费模式的中继会把上游各类错误（含 SiliconFlow 的限流 429 / TPM 超限）
+     * 统一透传成 502，因此不能只认 429——5xx 与网络层错误同样要按瞬时错误处理，
+     * 否则上层退避机制会完全失效（表现为整页 502 且无重试）。
+     *
+     * @param error 捕获的错误（经 axios 代理包装后为 {errorType, errorCode, errorMsg}，原始状态在 errorMsg 文本中）
+     *
+     * @returns 是否瞬时错误
+     */
+    private static isTransientError(error: unknown): boolean {
+        if (AITranslator.isRateLimitError(error)) return true;
+        const err = error as { errorType?: string, errorMsg?: string, message?: string };
+        const text = `${err?.errorType || ""} ${err?.errorMsg || ""} ${err?.message || ""}`;
+        // 5xx 网关 / 上游错误（含中继透传的 502/503/504）
+        if (/status code 5\d{2}/i.test(text)) return true;
+        // 网络层错误（fetch 失败、断网、DNS 等）
+        if (/NET_ERR|network|ECONN|ETIMEDOUT|EAI_AGAIN|failed to fetch|timeout/i.test(text)) return true;
+        return false;
+    }
+
+    /**
+     * 构造带统一前缀的瞬时错误，便于上层（background / 注入端）用正则识别并退避重试。
+     *
+     * @param error 捕获的错误
+     *
+     * @returns 规范化后的 Error（消息以 "AItrans transient error" 开头）
+     */
+    private static transientError(error: unknown): Error {
+        const err = error as { errorMsg?: string, message?: string };
+        const detail = String(err?.errorMsg || err?.message || error || "");
+        return new Error(`AItrans transient error: ${detail}`);
+    }
+
+    /**
+     * 统一对外抛出的错误：瞬时错误带可重试标记，便于上层识别并退避重试。
+     *
+     * @param error 捕获的错误
+     *
+     * @returns 规范化后的 Error
+     */
+    private static normalizeError(error: unknown): Error {
+        if (AITranslator.isTransientError(error)) {
+            return AITranslator.transientError(error);
+        }
+        return new Error("AItrans translation failed");
     }
 
     /**

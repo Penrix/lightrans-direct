@@ -283,91 +283,54 @@ channel.provide("get_lang", () => {
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'TRANSLATE_PAGE_CONTENT') {
-        // 使用AI翻译器直接翻译网页内容
+        // 使用AI翻译器批量翻译网页内容（注入端已将短文本合并为批次）
         (async () => {
-            try {
-                // 确保配置已初始化
-                await TRANSLATOR_MANAGER.config_loader;
-                
-                // 获取请求中的模型参数，默认为当前设置的模型
-                const requestedModel = message.model && message.model !== 'default' ? message.model : TRANSLATOR_MANAGER.AI_MODEL;
-                
-                // 保存当前模型，用于翻译后恢复
-                const originalModel = TRANSLATOR_MANAGER.AI_MODEL;
-                
-                // 如果请求的模型不同，临时切换模型
-                if (requestedModel !== originalModel) {
-                    TRANSLATOR_MANAGER.AI_TRANSLATOR.setCurrentModel(requestedModel);
-                }
-                
-                // 直接使用对象，无需JSON.parse
-                const contentData = message.content;
-                const { texts: filteredTexts, indices: textIndices } = contentData;
-                
-                // 检测源语言并设置目标语言
-                const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
-                
-                // 翻译结果数组
-                const translatedTexts = [];
-                
-                // 逐个翻译文本，支持分批次翻译，添加请求节流和重试机制
-                for (let i = 0; i < filteredTexts.length; i++) {
-                    const text = filteredTexts[i];
-                    let retries = 3; // 最多重试3次
-                    let success = false;
-                    
-                    while (retries > 0 && !success) {
-                        try {
-                            // 直接翻译单个文本，避免合并和拆分问题
-                            const result = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translate(text, 'auto', targetLang);
-                            translatedTexts[i] = result.mainMeaning;
-                            success = true;
-                        } catch (translateError) {
-                            retries--;
-                            console.error('Translation error for text:', text, translateError);
-                            
-                            if (retries > 0) {
-                                console.log('Retrying...', retries, 'attempts left');
-                                // 重试前等待一段时间，避免频繁请求
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                            } else {
-                                // 所有重试都失败，保留原文
-                                translatedTexts[i] = text;
-                                console.error('All retries failed, keeping original text');
-                            }
-                        }
-                    }
-                    
-                    // 每翻译10个文本等待一段时间，避免请求过快
-                    if ((i + 1) % 10 === 0) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                }
-                
-                // 确保所有文本都有翻译结果
-                for (let i = 0; i < filteredTexts.length; i++) {
-                    if (!translatedTexts[i]) {
-                        translatedTexts[i] = filteredTexts[i];
-                    }
-                }
-                
-                // 恢复原始模型
+            // 确保配置已初始化
+            await TRANSLATOR_MANAGER.config_loader;
+
+            // 获取请求中的模型参数，默认为当前设置的模型
+            const requestedModel = message.model && message.model !== 'default' ? message.model : TRANSLATOR_MANAGER.AI_MODEL;
+
+            // 保存当前模型，用于翻译后恢复
+            const originalModel = TRANSLATOR_MANAGER.AI_MODEL;
+
+            // 如果请求的模型不同，临时切换模型
+            if (requestedModel !== originalModel) {
+                TRANSLATOR_MANAGER.AI_TRANSLATOR.setCurrentModel(requestedModel);
+            }
+
+            // 统一恢复模型并响应，保证任何路径下都会还原
+            const finish = (payload) => {
                 if (requestedModel !== originalModel) {
                     TRANSLATOR_MANAGER.AI_TRANSLATOR.setCurrentModel(originalModel);
                 }
-                
-                // 发送翻译结果回注入脚本，直接传递对象
-                sendResponse({
+                sendResponse(payload);
+            };
+
+            try {
+                const texts = message.content.texts;
+                const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
+
+                // 批量翻译：内部自动处理编号合并、解析降级与单条兜底，
+                // 与输入等长返回（失败项保留原文），无需在此再做逐条循环与固定节流。
+                const translatedTexts = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(texts, 'auto', targetLang);
+
+                finish({
                     translatedContent: {
-                        texts: translatedTexts,
-                        indices: textIndices
+                        texts: translatedTexts
                     }
                 });
             } catch (error) {
-                console.error('Page translation error:', error);
-                sendResponse({
-                    error: error.message
-                });
+                const errorMessage = String(error && error.message || error);
+
+                // 瞬时错误（限流 429 / 中继透传的 502 等网关错误 / 网络抖动）：
+                // 标记后交由注入端退避并重发本批（此时整批尚无产出，重试无损）
+                if (/transient|429|rate\s*limit/i.test(errorMessage)) {
+                    finish({ rateLimited: true, error: errorMessage });
+                } else {
+                    console.error('Page translation error:', error);
+                    finish({ error: errorMessage });
+                }
             }
         })();
         return true; // 表示我们将异步发送响应

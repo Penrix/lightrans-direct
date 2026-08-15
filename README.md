@@ -4,6 +4,8 @@
 
 Lightrans 网页版已上线，项目地址：[Lightrans_web](https://github.com/W4J1e/lightran_web) ,在线[demo](https://trans.hin.cool/)。
 
+*特别提醒：本项目默认使用 Lightrans_web 同一个中继 API，源代码完全公开，但该服务不属于本项目开源的一部分。*
+
 ## 功能特性
 
 - **跨浏览器支持**：支持 Chrome 和 Firefox
