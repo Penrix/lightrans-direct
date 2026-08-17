@@ -29,31 +29,44 @@ export default function Error(props) {
             wrapperElement.classList.remove(ContentWrapperCenterClassName);
         };
     }, []);
+    // 模型繁忙：限免模型（如 Hunyuan-MT）高峰期扩容不及时或上游限流，
+    // 只展示友好提示，不再展示技术性的错误码/错误信息。
+    const isModelBusy = props.error.errorType === "MODEL_BUSY";
     return (
         <ErrorContainer ref={errorElRef}>
             <ErrorInfo>
                 <StyledErrorIcon />
                 <ErrorType>
-                    {props.error.errorType === "API_ERR"
+                    {isModelBusy
+                        ? chrome.i18n.getMessage("MODEL_BUSY")
+                        : props.error.errorType === "API_ERR"
                         ? chrome.i18n.getMessage("APIERR")
                         : chrome.i18n.getMessage("NETERR")}
                 </ErrorType>
-                <ErrorMessage>
-                    {`${chrome.i18n.getMessage("ERR_CODE")}: ${JSON.stringify(
-                        props.error.errorCode
-                    )}`}
-                </ErrorMessage>
-                <ErrorMessage>
-                    {`${chrome.i18n.getMessage("ERR_MSG")}: ${JSON.stringify(
-                        props.error.errorMsg
-                    )}`}
-                </ErrorMessage>
-                {props.error.errorAct && (
-                    <ErrorMessage>
-                        {`${chrome.i18n.getMessage("ERR_ACT")}: ${JSON.stringify(
-                            props.error.errorAct
-                        )}`}
-                    </ErrorMessage>
+                {!isModelBusy && (
+                    <>
+                        {props.error.errorCode !== undefined && (
+                            <ErrorMessage>
+                                {`${chrome.i18n.getMessage("ERR_CODE")}: ${JSON.stringify(
+                                    props.error.errorCode
+                                )}`}
+                            </ErrorMessage>
+                        )}
+                        {props.error.errorMsg !== undefined && (
+                            <ErrorMessage>
+                                {`${chrome.i18n.getMessage("ERR_MSG")}: ${JSON.stringify(
+                                    props.error.errorMsg
+                                )}`}
+                            </ErrorMessage>
+                        )}
+                        {props.error.errorAct && (
+                            <ErrorMessage>
+                                {`${chrome.i18n.getMessage("ERR_ACT")}: ${JSON.stringify(
+                                    props.error.errorAct
+                                )}`}
+                            </ErrorMessage>
+                        )}
+                    </>
                 )}
             </ErrorInfo>
         </ErrorContainer>

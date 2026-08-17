@@ -121,6 +121,25 @@ function addEventListener() {
  */
 
 /**
+ * 将翻译错误消息转换为用户友好的提示文案
+ *
+ * @param {String} message 错误消息
+ * @returns {String} 友好的提示文案
+ */
+function friendlyTranslateError(message) {
+    // 限流 / 网关错误（免费中继会把上游限流透传成 502）：提示模型负载高
+    if (/transient|429|rate\s*limit|status code 5\d{2}/i.test(message)) {
+        return chrome.i18n.getMessage("MODEL_BUSY") || "该模型负载高，请使用其它模型或稍后重试。";
+    }
+    // 网络层错误（断网、超时等）
+    if (/network|timeout|NET_ERR|ECONN|failed to fetch/i.test(message)) {
+        return chrome.i18n.getMessage("NETERR") || "网络错误！请检查您的网络连接。";
+    }
+    // 其他错误（如自定义模式缺少 API Key）保留原始消息，便于用户定位配置问题
+    return `翻译失败：${message}`;
+}
+
+/**
  * 负责在弹窗中输入内容后进行翻译
  */
 function translateSubmit() {
@@ -128,7 +147,7 @@ function translateSubmit() {
     if (content.replace(/\s*/, "") !== "") {
         // 判断值是否为空
         document.getElementById("hint_message").style.display = "none";
-        
+
         // 显示加载状态
         const resultDiv = document.getElementById("translated-text");
         resultDiv.innerHTML = "翻译中...";
@@ -136,20 +155,23 @@ function translateSubmit() {
         // 获取当前弹窗的语言设置
         const sl = sourceLanguage.value;
         const tl = targetLanguage.value;
-        
+
         // 直接发送翻译请求，获取结果后显示在当前弹窗
-        channel.request("translate_in_popup", { 
-            text: content, 
-            sl: sl, 
-            tl: tl 
+        channel.request("translate_in_popup", {
+            text: content,
+            sl: sl,
+            tl: tl
         }).then((result) => {
-            if (result && result.mainMeaning) {
+            if (result && result.__serviceError) {
+                // background 服务处理失败（如模型负载高、网络错误）
+                resultDiv.innerHTML = friendlyTranslateError(result.__serviceError);
+            } else if (result && result.mainMeaning) {
                 resultDiv.innerHTML = result.mainMeaning;
             } else {
                 resultDiv.innerHTML = "翻译失败，请重试";
             }
         }).catch((error) => {
-            resultDiv.innerHTML = `翻译错误: ${error.message}`;
+            resultDiv.innerHTML = friendlyTranslateError(String((error && error.message) || error));
         });
     } // 提示输入的内容为空
     else document.getElementById("hint_message").style.display = "inline";

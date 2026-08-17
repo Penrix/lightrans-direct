@@ -435,6 +435,10 @@
         "message": "Request parameters error. Please try using other translators or wait a moment and retry. If translation is still broken, please contact developers.",
         "description": "API parameters error."
     },
+    "MODEL_BUSY": {
+        "message": "This model is under heavy load. Please try another model or retry later.",
+        "description": "Model busy message."
+    },
     "PRONOUN_ERR": {
         "message": "Pronouncing failed, please check your network or choose another translator.",
         "description": "Pronouncing failed message."

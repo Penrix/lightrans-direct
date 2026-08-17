@@ -31,15 +31,15 @@ class AITranslator {
      * Available translation models.
      */
     private availableModels: string[] = [
-        "tencent/Hunyuan-MT-7B",
         "THUDM/GLM-4-9B-0414",
-        "Qwen/Qwen3.5-4B"
+        "Qwen/Qwen3.5-4B",
+        "tencent/Hunyuan-MT-7B"
     ];
 
     /**
      * Current model to use.
      */
-    private currentModel: string = "Qwen/Qwen3.5-4B";
+    private currentModel: string = "THUDM/GLM-4-9B-0414";
 
     /**
      * Detect language of given text.

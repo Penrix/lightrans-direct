@@ -350,8 +350,24 @@ class TranslatorManager {
             });
         } catch (error) {
             // Inform current tab translating failed.
+            // Error 对象经消息通道 JSON 序列化后仅剩 message，需在此构造结构化错误，
+            // 并按瞬时特征分类：限流/网关错误（中继会把上游限流透传成 502）视为模型繁忙，
+            // 网络层错误视为网络异常，其余按接口错误展示。
+            const message = String(
+                (error && (error.message || error.errorMsg)) || error
+            );
+            let errorType = "API_ERR";
+            if (/transient|429|rate\s*limit|status code 5\d{2}/i.test(message)) {
+                errorType = "MODEL_BUSY";
+            } else if (/network|timeout|NET_ERR|ECONN|failed to fetch/i.test(message)) {
+                errorType = "NET_ERR";
+            }
             this.channel.emitToTabs(currentTabId, "translating_error", {
-                error,
+                error: {
+                    errorType: errorType,
+                    errorCode: 0,
+                    errorMsg: message,
+                },
                 timestamp,
             });
         }

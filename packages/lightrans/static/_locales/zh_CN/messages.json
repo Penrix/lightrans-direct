@@ -435,6 +435,10 @@
         "message": "请求参数错误。请尝试使用其他翻译器或稍等片刻后重试。如果翻译仍然失败，请联系开发人员。",
         "description": "API参数错误"
     },
+    "MODEL_BUSY": {
+        "message": "该模型当前负载高，请使用其它模型或稍后重试。",
+        "description": "模型繁忙提示"
+    },
     "PRONOUN_ERR": {
         "message": "发音失败，请检查您的网络或选择其他翻译器。",
         "description": "发音失败消息"

@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
         UsePDFjs: true,
     },
     DefaultTranslator: "AITrans",
-    AIModel: "tencent/Hunyuan-MT-7B",
+    AIModel: "THUDM/GLM-4-9B-0414",
     DefaultPageTranslator: "AITrans",
     // Page translation display mode: "original" / "translated" / "bilingual"
     PageTranslationDisplayMode: "translated",

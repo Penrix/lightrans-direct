@@ -435,6 +435,10 @@
         "message": "請求參數錯誤。請嘗試使用其他翻譯器或稍等片刻後重試。如果翻譯仍然失敗，請聯繫開發人員。",
         "description": "API參數錯誤"
     },
+    "MODEL_BUSY": {
+        "message": "該模型當前負載高，請使用其它模型或稍後重試。",
+        "description": "模型繁忙提示"
+    },
     "PRONOUN_ERR": {
         "message": "發音失敗，請檢查您的網絡或選擇其他翻譯器。",
         "description": "發音失敗消息"

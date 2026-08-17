@@ -447,6 +447,10 @@
         "message": "Request parameters error. Please try using other translators or wait a moment and retry. If translation is still broken, please contact developers.",
         "description": "API parameters error."
     },
+    "MODEL_BUSY": {
+        "message": "このモデルは現在負荷が高くなっています。別のモデルを使用するか、しばらくしてから再試行してください。",
+        "description": "モデルがビジー状態のメッセージ。"
+    },
     "PRONOUN_ERR": {
         "message": "Pronouncing failed, please check your network or choose another translator.",
         "description": "Pronouncing failed message."

@@ -51,8 +51,17 @@ class Channel {
                             if (!server) break;
 
                             // We can call the callback only when we really provide the requested service.
+                            // 失败时也必须回调（Error 对象序列化后仅剩 message），
+                            // 否则请求方的 Promise 永远挂起（如 popup 一直停留在"翻译中..."）。
                             server(parsed.params, sender).then(
-                                (result) => callback && callback(result)
+                                (result) => callback && callback(result),
+                                (error) =>
+                                    callback &&
+                                    callback({
+                                        __serviceError: String(
+                                            (error && (error.message || error.errorMsg)) || error
+                                        ),
+                                    })
                             );
                             return true;
                         }
