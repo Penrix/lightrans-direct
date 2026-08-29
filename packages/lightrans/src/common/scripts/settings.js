@@ -1,24 +1,20 @@
 import { BROWSER_LANGUAGES_MAP } from "common/scripts/languages.js";
 
 /**
- * default settings for this extension
+ * Settings that are safe to sync between browsers.
+ * Provider API keys are intentionally excluded and live in chrome.storage.local.
  */
 const DEFAULT_SETTINGS = {
     blacklist: {
         urls: {},
         domains: { "chrome.google.com": true, extensions: true },
     },
-    // Resize: determine whether the web page will resize when showing translation result
-    // RTL: determine whether the text in translation block should display from right to left
-    // FoldLongContent: determine whether to fold long translation content
-    // SelectTranslatePosition: the position of select translate button.
     LayoutSettings: {
         Resize: false,
         RTL: false,
         FoldLongContent: true,
         SelectTranslatePosition: "TopRight",
     },
-    // Default settings of source language and target language
     languageSetting: { sl: "auto", tl: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()] },
     OtherSettings: {
         MutualTranslate: true,
@@ -26,35 +22,26 @@ const DEFAULT_SETTINGS = {
         TranslateAfterDblClick: false,
         TranslateAfterSelect: false,
         CancelTextSelection: false,
-        UseGoogleAnalytics: true,
         UsePDFjs: true,
     },
     DefaultTranslator: "AITrans",
-    AIModel: "THUDM/GLM-4-9B-0414",
     DefaultPageTranslator: "AITrans",
-    // Page translation display mode: "original" / "translated" / "bilingual"
+    // Provider: siliconflow | gemini
+    TranslationProvider: "siliconflow",
+    // Shared active model. The options page replaces it with the provider default when provider changes.
+    AIModel: "tencent/Hunyuan-MT-7B",
+    // Page translation display mode: original | translated | bilingual
     PageTranslationDisplayMode: "translated",
-    // 翻译服务模式：free（硅基流动免费，走我们的反代服务，零配置免 Key）/ custom（硅基流动自定义，直连官方 + 自有 Key）
-    TranslationService: "free",
-    // 自定义模式下使用的 SiliconFlow API Key（仅 custom 模式读取）
-    ApiKey: "",
-    // 自定义模式下是否使用用户自己输入的模型名称（勾选后模型选择框变为可输入）
+    // Allow an arbitrary provider model id instead of the built-in list.
     CustomModel: false,
-    // 自定义模型名称（CustomModel 为 true 时生效，翻译时作为 model 字段直连硅基流动）
     CustomModelName: "",
     HybridTranslatorConfig: {
-        // The translators used in current hybrid translate.
         translators: ["AITrans"],
-
-        // The translators for each item.
         selections: {
-            // ATTENTION: The following four items MUST HAVE THE SAME TRANSLATOR!
             originalText: "AITrans",
             mainMeaning: "AITrans",
             tPronunciation: "AITrans",
             sPronunciation: "AITrans",
-
-            // For the following three items, any translator combination is OK.
             detailedMeanings: "AITrans",
             definitions: "AITrans",
             examples: "AITrans",
@@ -64,13 +51,23 @@ const DEFAULT_SETTINGS = {
 };
 
 /**
- * assign default value to settings which are undefined in recursive way
- * @param {*} result setting result stored in chrome.storage
- * @param {*} settings default settings
+ * Secrets are device-local by design. They are not written to chrome.storage.sync.
+ */
+const DEFAULT_SECRETS = {
+    ProviderSecrets: {
+        siliconflow: "",
+        gemini: "",
+    },
+};
+
+/**
+ * Assign default values recursively without overwriting existing values.
+ *
+ * @param {*} result stored settings
+ * @param {*} settings defaults
  */
 function setDefaultSettings(result, settings) {
     for (let i in settings) {
-        // settings[i] contains key-value settings
         if (
             typeof settings[i] === "object" &&
             !(settings[i] instanceof Array) &&
@@ -79,42 +76,34 @@ function setDefaultSettings(result, settings) {
             if (result[i]) {
                 setDefaultSettings(result[i], settings[i]);
             } else {
-                // settings[i] contains several setting items but these have not been set before
                 result[i] = settings[i];
             }
         } else if (result[i] === undefined) {
-            // settings[i] is a single setting item and it has not been set before
             result[i] = settings[i];
         }
     }
 }
 
 /**
- * Get settings from storage. If some of the settings have not been initialized,
- * initialize them with the given default values.
+ * Get synced settings and initialize missing defaults.
  *
- * @param {String | Array<String>} settings setting name to get
- * @param {Object | Function} defaults default values or function to generate default values
+ * @param {String | Array<String>} settings setting names
+ * @param {Object | Function} defaults default values
  * @returns {Promise<Any>} settings
  */
 function getOrSetDefaultSettings(settings, defaults) {
     return new Promise((resolve) => {
-        // If there is only one setting to get, warp it up.
         if (typeof settings === "string") {
             settings = [settings];
         } else if (settings === undefined) {
-            // If settings is undefined, collect all setting keys in defaults.
-            settings = [];
-            for (let key in defaults) {
-                settings.push(key);
-            }
+            settings = Object.keys(defaults);
         }
 
         chrome.storage.sync.get(settings, (result) => {
             let updated = false;
 
             for (let setting of settings) {
-                if (!result[setting]) {
+                if (result[setting] === undefined) {
                     if (typeof defaults === "function") {
                         defaults = defaults(settings);
                     }
@@ -132,4 +121,72 @@ function getOrSetDefaultSettings(settings, defaults) {
     });
 }
 
-export { DEFAULT_SETTINGS, setDefaultSettings, getOrSetDefaultSettings };
+/**
+ * Read provider secrets from local-only extension storage.
+ *
+ * @returns {Promise<{ProviderSecrets: {siliconflow: string, gemini: string}}>} local secrets
+ */
+function getOrSetLocalSecrets() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(["ProviderSecrets"], (result) => {
+            const secrets = result || {};
+            setDefaultSettings(secrets, DEFAULT_SECRETS);
+            chrome.storage.local.set({ ProviderSecrets: secrets.ProviderSecrets }, () => resolve(secrets));
+        });
+    });
+}
+
+/**
+ * Save one provider API key locally. Never sync it through the browser account.
+ *
+ * @param {string} provider siliconflow | gemini
+ * @param {string} key API key
+ * @returns {Promise<void>} completion
+ */
+async function setProviderSecret(provider, key) {
+    const local = await getOrSetLocalSecrets();
+    local.ProviderSecrets[provider] = (key || "").trim();
+    return new Promise((resolve) => {
+        chrome.storage.local.set({ ProviderSecrets: local.ProviderSecrets }, resolve);
+    });
+}
+
+/**
+ * One-time migration from upstream Lightrans, which stored ApiKey in chrome.storage.sync.
+ * The legacy key represented SiliconFlow only. Copy it locally, then remove the synced copy.
+ *
+ * @returns {Promise<boolean>} true when a key was migrated
+ */
+function migrateLegacyApiKey() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(["ApiKey", "TranslationService"], async (legacy) => {
+            const legacyKey = (legacy.ApiKey || "").trim();
+            if (legacyKey) {
+                const local = await getOrSetLocalSecrets();
+                if (!local.ProviderSecrets.siliconflow) {
+                    await setProviderSecret("siliconflow", legacyKey);
+                }
+            }
+
+            const removals = [];
+            if (legacy.ApiKey !== undefined) removals.push("ApiKey");
+            if (legacy.TranslationService !== undefined) removals.push("TranslationService");
+
+            if (removals.length > 0) {
+                chrome.storage.sync.remove(removals, () => resolve(!!legacyKey));
+            } else {
+                resolve(false);
+            }
+        });
+    });
+}
+
+export {
+    DEFAULT_SETTINGS,
+    DEFAULT_SECRETS,
+    setDefaultSettings,
+    getOrSetDefaultSettings,
+    getOrSetLocalSecrets,
+    setProviderSecret,
+    migrateLegacyApiKey,
+};
