@@ -7,7 +7,6 @@ type GlossaryEntry = {
 
 type TranslationPreferences = {
     glossaryEnabled: boolean;
-    autoAnnotateTerms: boolean;
     glossary: GlossaryEntry[];
 };
 
@@ -40,10 +39,10 @@ class AITranslator {
     }
 
     /**
-     * Translate directly through SiliconFlow. User-defined glossary entries are
-     * protected with deterministic placeholder tokens before text reaches the model,
-     * then restored after generation. Automatic annotation is intentionally aimed at
-     * technical concepts/domain nouns, not software or brand proper names.
+     * Translate directly through SiliconFlow. Translation is intentionally plain:
+     * the model is not asked to auto-annotate, preserve, or explain English terms.
+     * User-defined glossary entries are the only explicit override and are protected
+     * with deterministic placeholders before generation, then restored afterwards.
      */
     private async requestTranslate(
         from: string,
@@ -63,16 +62,15 @@ class AITranslator {
             ? AITranslator.protectGlossary(text, preferences.glossary)
             : { text, replacements: [] as Array<{ token: string; display: string }> };
 
-        const terminologyInstruction = AITranslator.isChineseTarget(to) && preferences.autoAnnotateTerms
-            ? " When an English domain-specific noun, technical concept, jargon term, or acronym would be easier to understand if its original English form is retained, render EVERY occurrence as EnglishTerm（简短中文释义）, for example frontmatter（文档前置元数据）, backlink（反向链接）, API（应用程序编程接口）. Do NOT automatically annotate software names, product names, brands, company names, project names, people, or other proper names such as Obsidian, GitHub, Notion, Microsoft, or OpenAI; keep those names unchanged. Do NOT annotate ordinary everyday English words. Prefer only genuinely useful technical/domain terms, and never invent an explanation when unsure."
-            : "";
         const glossaryInstruction = protectedText.replacements.length > 0
-            ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written. Treat each placeholder as an opaque protected term: never translate it, annotate it, put it inside a newly added explanation, remove it, split it, or alter it."
+            ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written. Treat each placeholder as opaque: never translate it, annotate it, explain it, remove it, split it, or alter it."
             : "";
+        const plainTranslationInstruction =
+            " Translate all source-language content naturally into the target language. Do not add bilingual glosses, definitions, explanatory notes, or parenthetical explanations that are not present in the source. Do not intentionally keep English words merely to annotate them.";
 
         const systemPrompt = batch
-            ? `Translate each numbered segment from ${from} to ${to}. Keep every <N> tag exactly and return only tagged translations.${terminologyInstruction}${glossaryInstruction}`
-            : `Translate the text from ${from} to ${to}. Preserve meaning, tone, proper names and formatting. Return only the translation.${terminologyInstruction}${glossaryInstruction}`;
+            ? `Translate each numbered segment from ${from} to ${to}. Keep every <N> tag exactly and return only tagged translations.${plainTranslationInstruction}${glossaryInstruction}`
+            : `Translate the text from ${from} to ${to}. Preserve meaning, tone and formatting. Return only the translation.${plainTranslationInstruction}${glossaryInstruction}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
@@ -202,7 +200,6 @@ class AITranslator {
     private async resolveTranslationPreferences(): Promise<TranslationPreferences> {
         const fallback: TranslationPreferences = {
             glossaryEnabled: true,
-            autoAnnotateTerms: true,
             glossary: AITranslator.parseGlossary(AITranslator.DEFAULT_GLOSSARY),
         };
 
@@ -220,22 +217,18 @@ class AITranslator {
             if (!syncStorage) return fallback;
 
             return await new Promise<TranslationPreferences>((resolve) => {
-                syncStorage.get(
-                    ["GlossaryEnabled", "AutoAnnotateTerms", "GlossaryText"],
-                    (result) => {
-                        let glossaryText = typeof result.GlossaryText === "string"
-                            ? result.GlossaryText
-                            : AITranslator.DEFAULT_GLOSSARY;
-                        if (glossaryText.trim() === AITranslator.LEGACY_SOFTWARE_GLOSSARY) {
-                            glossaryText = "";
-                        }
-                        resolve({
-                            glossaryEnabled: result.GlossaryEnabled !== false,
-                            autoAnnotateTerms: result.AutoAnnotateTerms !== false,
-                            glossary: AITranslator.parseGlossary(glossaryText),
-                        });
+                syncStorage.get(["GlossaryEnabled", "GlossaryText"], (result) => {
+                    let glossaryText = typeof result.GlossaryText === "string"
+                        ? result.GlossaryText
+                        : AITranslator.DEFAULT_GLOSSARY;
+                    if (glossaryText.trim() === AITranslator.LEGACY_SOFTWARE_GLOSSARY) {
+                        glossaryText = "";
                     }
-                );
+                    resolve({
+                        glossaryEnabled: result.GlossaryEnabled !== false,
+                        glossary: AITranslator.parseGlossary(glossaryText),
+                    });
+                });
             });
         } catch {
             return fallback;
@@ -290,10 +283,9 @@ class AITranslator {
     }
 
     /**
-     * Models occasionally try to "help" by annotating an opaque placeholder even
-     * when instructed not to. Strip only a short parenthetical suffix immediately
-     * attached to a protected token before deterministic restoration. This avoids
-     * outputs such as Term（...（...）） without touching normal parentheses elsewhere.
+     * If a model adds an unsolicited parenthetical explanation directly after a
+     * protected placeholder, remove that suffix before deterministic restoration.
+     * This is deliberately narrow so normal source parentheses remain untouched.
      */
     private static stripPlaceholderAnnotations(
         text: string,
@@ -320,10 +312,6 @@ class AITranslator {
             restored = restored.split(replacement.token).join(replacement.display);
         }
         return restored;
-    }
-
-    private static isChineseTarget(language: string): boolean {
-        return /^zh(?:-|$)/i.test(language || "");
     }
 
     async translate(text: string, from: string, to: string): Promise<TranslationResult> {
