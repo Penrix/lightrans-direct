@@ -32,7 +32,7 @@ Google 当前说明 Gemini Developer API 的免费层内容可能用于改进其
 - 目标语言：沿用浏览器 / 扩展原有语言设置
 - 页面翻译：仅译文
 
-Gemini 默认模型为 `gemini-3.5-flash-lite`，并提供 `gemini-3.5-flash` 作为更高质量选项；两者当前都在 Gemini Developer API 的 Free Tier 中提供免费输入/输出额度。
+Gemini 默认模型为 `gemini-3.7-flash`。设置中还提供 `gemini-3.5-flash-lite`（官方明确针对高吞吐、翻译和简单数据处理优化）以及 `gemini-3.5-flash`；这些模型当前的 Standard Free Tier 都提供免费输入/输出额度。
 
 也可以启用“自定义模型”，手动填写对应 Provider 支持的模型 ID。
 
