@@ -9,7 +9,9 @@
 翻译请求只发送到你在设置中选择的 Provider：
 
 - **SiliconFlow**：`https://api.siliconflow.cn/v1/chat/completions`
-- **Gemini API**：`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`
+- **Gemini API**：`https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+
+Gemini 直接使用 Google 原生 `generateContent` API，不经过 OpenAI compatibility layer；Gemini 3.x 翻译请求会使用尽量低的 thinking level 以降低延迟。
 
 本分支不使用 Lightrans 原有的 `trans.hin.cool` 开发者中继，也不内置共享 Relay Token。
 
@@ -21,7 +23,8 @@ Google 当前说明 Gemini Developer API 的免费层内容可能用于改进其
 
 官方参考：
 
-- Gemini OpenAI compatibility: https://ai.google.dev/gemini-api/docs/openai
+- Gemini native generateContent: https://ai.google.dev/api/generate-content
+- Gemini thinking configuration: https://ai.google.dev/gemini-api/docs/thinking
 - Gemini API pricing / data-use notes: https://ai.google.dev/gemini-api/docs/pricing
 - SiliconFlow Chat Completions: https://docs.siliconflow.cn/en/api-reference/chat-completions/chat-completions
 
@@ -32,7 +35,9 @@ Google 当前说明 Gemini Developer API 的免费层内容可能用于改进其
 - 目标语言：沿用浏览器 / 扩展原有语言设置
 - 页面翻译：仅译文
 
-Gemini 默认模型为 `gemini-3.7-flash`。设置中还提供 `gemini-3.5-flash-lite`（官方明确针对高吞吐、翻译和简单数据处理优化）以及 `gemini-3.5-flash`；这些模型当前的 Standard Free Tier 都提供免费输入/输出额度。
+SiliconFlow 内置 `tencent/Hunyuan-MT-7B`、`THUDM/GLM-4-9B-0414`、`Qwen/Qwen3.5-4B` 三个当前官方 Lightrans 文档列出的免费模型。免费状态由 Provider 决定，未来可能变化。
+
+Gemini 默认模型为 `gemini-3.5-flash-lite`，因为 Google 将其定位为低延迟、高吞吐，并明确针对翻译和简单数据处理优化；同时提供 `gemini-3.5-flash` 和 `gemini-3.7-flash`。这些模型当前的 Standard Free Tier 都提供免费输入/输出额度。
 
 也可以启用“自定义模型”，手动填写对应 Provider 支持的模型 ID。
 
@@ -46,6 +51,7 @@ Gemini 默认模型为 `gemini-3.7-flash`。设置中还提供 `gemini-3.5-flash
 - PDF 翻译
 - 页面与域名黑名单
 - SiliconFlow / Gemini 直连
+- Provider / 模型可在弹窗直接切换
 - Provider API Key 本机保存
 
 ## 安装开发版
