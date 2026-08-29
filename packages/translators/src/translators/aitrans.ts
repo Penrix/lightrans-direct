@@ -3,10 +3,10 @@ import { TranslationResult } from "../types";
 type Provider = "siliconflow" | "gemini";
 
 class AITranslator {
-    private static readonly ENDPOINTS: Record<Provider, string> = {
-        siliconflow: "https://api.siliconflow.cn/v1/chat/completions",
-        gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    };
+    private static readonly SILICONFLOW_ENDPOINT =
+        "https://api.siliconflow.cn/v1/chat/completions";
+    private static readonly GEMINI_BASE_ENDPOINT =
+        "https://generativelanguage.googleapis.com/v1beta/models";
 
     private static readonly MODELS: Record<Provider, string[]> = {
         siliconflow: [
@@ -14,10 +14,10 @@ class AITranslator {
             "THUDM/GLM-4-9B-0414",
             "Qwen/Qwen3.5-4B",
         ],
-        gemini: ["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"],
+        gemini: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
     };
 
-    private static readonly REQUEST_TIMEOUT_MS = 25000;
+    private static readonly REQUEST_TIMEOUT_MS = 20000;
 
     private provider: Provider = "siliconflow";
     private apiKey = "";
@@ -55,12 +55,52 @@ class AITranslator {
             ? `You are a professional translator. Translate each numbered text segment (delimited by tags like <1>, <2>) from ${from} to ${to}. Keep exactly the same tag format in your output, one translated segment per tag. Do not merge, split, add or remove any segments. Return only the tagged translations.`
             : `You are a professional translator. Translate the following text from ${from} to ${to}. Preserve meaning, tone, names and formatting. Only return the translated text, no explanations.`;
 
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-        };
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
 
-        const commonBody: Record<string, unknown> = {
+        try {
+            if (this.provider === "gemini") {
+                return await this.requestGeminiNative(
+                    model,
+                    apiKey,
+                    systemPrompt,
+                    text,
+                    maxTokens,
+                    controller.signal
+                );
+            }
+
+            return await this.requestSiliconFlow(
+                model,
+                apiKey,
+                systemPrompt,
+                text,
+                maxTokens,
+                controller.signal
+            );
+        } catch (error) {
+            const candidate = error as { name?: string; message?: string };
+            if (candidate?.name === "AbortError") {
+                throw new Error(
+                    `${providerName} 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
+                    "请切换其它模型或检查当前网络/代理。"
+                );
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    private async requestSiliconFlow(
+        model: string,
+        apiKey: string,
+        systemPrompt: string,
+        text: string,
+        maxTokens: number,
+        signal: AbortSignal
+    ): Promise<string> {
+        const body: Record<string, unknown> = {
             model,
             messages: [
                 { role: "system", content: systemPrompt },
@@ -68,61 +108,121 @@ class AITranslator {
             ],
             temperature: 0.2,
             max_tokens: maxTokens,
+            ...(model.startsWith("Qwen/") ? { enable_thinking: false } : {}),
         };
 
-        const body = this.provider === "siliconflow"
-            ? {
-                ...commonBody,
-                ...(model.startsWith("Qwen/") ? { enable_thinking: false } : {}),
-            }
-            : {
-                ...commonBody,
-                ...(model === "gemini-3.7-flash" ? { reasoning_effort: "low" } : {}),
-            };
+        const response = await fetch(AITranslator.SILICONFLOW_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+            signal,
+        });
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
-
-        try {
-            const response = await fetch(AITranslator.ENDPOINTS[this.provider], {
-                method: "POST",
-                headers,
-                body: JSON.stringify(body),
-                signal: controller.signal,
-            });
-
-            const raw = await response.text();
-            let data: any = {};
-            if (raw) {
-                try {
-                    data = JSON.parse(raw);
-                } catch {
-                    data = { raw };
-                }
-            }
-
-            if (!response.ok) {
-                const detail = AITranslator.extractProviderError(data, raw, response.statusText);
-                throw new Error(`${providerName} API ${response.status}: ${detail}`);
-            }
-
-            const translated = (data?.choices?.[0]?.message?.content || "").toString().trim();
-            if (!translated) {
-                throw new Error(`${providerName} 返回了空译文`);
-            }
-            return translated;
-        } catch (error) {
-            const candidate = error as { name?: string; message?: string };
-            if (candidate?.name === "AbortError") {
-                throw new Error(
-                    `${providerName} 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
-                    "请检查当前网络/代理是否能直连该 Provider，或切换其它模型后重试。"
-                );
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeoutId);
+        const data = await AITranslator.readJsonResponse(response, "SiliconFlow");
+        const translated = (data?.choices?.[0]?.message?.content || "").toString().trim();
+        if (!translated) {
+            throw new Error("SiliconFlow 返回了空译文");
         }
+        return translated;
+    }
+
+    /**
+     * Use Gemini's native generateContent endpoint rather than its OpenAI
+     * compatibility layer. Google recommends native Gemini API calls when OpenAI
+     * library compatibility is not required. Translation is latency-sensitive, so
+     * Gemini 3.x thinking is explicitly kept at the lowest supported level.
+     */
+    private async requestGeminiNative(
+        model: string,
+        apiKey: string,
+        systemPrompt: string,
+        text: string,
+        maxTokens: number,
+        signal: AbortSignal
+    ): Promise<string> {
+        const generationConfig: Record<string, unknown> = {
+            temperature: 0.2,
+            maxOutputTokens: maxTokens,
+        };
+
+        const thinkingLevel = AITranslator.geminiThinkingLevel(model);
+        if (thinkingLevel) {
+            generationConfig.thinkingConfig = { thinkingLevel };
+        }
+
+        const body = {
+            systemInstruction: {
+                parts: [{ text: systemPrompt }],
+            },
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text }],
+                },
+            ],
+            generationConfig,
+        };
+
+        const endpoint =
+            `${AITranslator.GEMINI_BASE_ENDPOINT}/${encodeURIComponent(model)}:generateContent`;
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify(body),
+            signal,
+        });
+
+        const data = await AITranslator.readJsonResponse(response, "Gemini");
+        const parts = data?.candidates?.[0]?.content?.parts;
+        const translated = Array.isArray(parts)
+            ? parts
+                .filter((part: any) => !part?.thought && typeof part?.text === "string")
+                .map((part: any) => part.text)
+                .join("")
+                .trim()
+            : "";
+
+        if (!translated) {
+            const finishReason = data?.candidates?.[0]?.finishReason;
+            const blockReason = data?.promptFeedback?.blockReason;
+            const reason = blockReason || finishReason;
+            throw new Error(
+                reason ? `Gemini 返回了空译文（${reason}）` : "Gemini 返回了空译文"
+            );
+        }
+        return translated;
+    }
+
+    private static geminiThinkingLevel(model: string): "minimal" | "low" | null {
+        if (model === "gemini-3.7-flash") return "low";
+        if (model === "gemini-3.5-flash" || model === "gemini-3.5-flash-lite") {
+            return "minimal";
+        }
+        return null;
+    }
+
+    private static async readJsonResponse(response: Response, providerName: string): Promise<any> {
+        const raw = await response.text();
+        let data: any = {};
+        if (raw) {
+            try {
+                data = JSON.parse(raw);
+            } catch {
+                data = { raw };
+            }
+        }
+
+        if (!response.ok) {
+            const detail = AITranslator.extractProviderError(data, raw, response.statusText);
+            throw new Error(`${providerName} API ${response.status}: ${detail}`);
+        }
+        return data;
     }
 
     private static extractProviderError(data: any, raw: string, fallback: string): string {
