@@ -12,7 +12,10 @@ const PROVIDER_MODELS = {
         "THUDM/GLM-4-9B-0414",
         "Qwen/Qwen3.5-4B",
     ],
-    gemini: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
+    // Browser smoke testing currently shows 3.5 Flash as the useful Gemini
+    // option for interactive translation. Experimental model IDs can still be
+    // entered through the custom-model field below.
+    gemini: ["gemini-3.5-flash"],
 };
 
 window.onload = async () => {
@@ -69,7 +72,7 @@ window.onload = async () => {
         }
         if (privacyNote) {
             privacyNote.textContent = provider === "gemini"
-                ? "Gemini 免费层：网页文本会直传 Google；Google 当前说明免费层内容可能用于改进产品。"
+                ? "Gemini 免费层：网页文本会直传 Google；Google 当前说明免费层内容可能用于改进产品。普通下拉仅保留当前实测可用的 3.5 Flash，其它模型可用自定义模型实验。"
                 : "SiliconFlow：网页文本会直传 SiliconFlow；本扩展不经过开发者中继服务器。";
         }
         syncCustomModelVisibility();
