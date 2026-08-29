@@ -33,11 +33,9 @@ const DEFAULT_SETTINGS = {
     PageTranslationDisplayMode: "translated",
     CustomModel: false,
     CustomModelName: "",
-    // Deterministic terminology layer. The glossary starts empty: software/product
-    // names are normally preserved as proper names, while automatic annotation is
-    // aimed at technical concepts, domain nouns and acronyms that benefit from a gloss.
+    // Optional deterministic override layer. Normal translation does not auto-annotate
+    // or preserve English terms; only user-written glossary rules override model output.
     GlossaryEnabled: true,
-    AutoAnnotateTerms: true,
     GlossaryText: "",
     HybridTranslatorConfig: {
         translators: ["AITrans"],
