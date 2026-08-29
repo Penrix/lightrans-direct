@@ -10,9 +10,9 @@ const PROVIDER_MODELS = {
         "Qwen/Qwen3.5-4B",
     ],
     gemini: [
-        "gemini-3.7-flash",
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
+        "gemini-3.7-flash",
     ],
 };
 
