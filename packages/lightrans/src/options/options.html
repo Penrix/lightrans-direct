@@ -109,20 +109,21 @@
                             <label for="auto-annotate-terms" class="checked-label">自动给英文软件名 / 技术词加中文注释</label>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="column" style="flex: 1 1 auto; min-width: 0;">
-                            <label for="glossary-text" class="checked-label" style="display: block; line-height: 1.6;">
-                                固定术语表（每行一条：<code>原词 = 最终显示文本</code>）
+                    <div class="row" style="padding-top: 2px; padding-bottom: 4px;">
+                        <div class="column" style="flex: 1 1 auto; min-width: 0; max-width: 100%; display: block;">
+                            <label for="glossary-text" class="checked-label" style="display: block; line-height: 1.4;">
+                                固定术语表：每行 <code>原词 = 最终显示文本</code>
                             </label>
                             <textarea
                                 id="glossary-text"
+                                rows="2"
                                 spellcheck="false"
                                 placeholder="Obsidian = Obsidian（笔记与知识管理软件）"
-                                style="width: 100%; min-height: 130px; box-sizing: border-box; margin-top: 8px; padding: 10px 12px; resize: vertical; border: 1px solid #d8dee8; border-radius: 8px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
+                                style="width: 100%; height: 54px; min-height: 54px; max-height: 160px; box-sizing: border-box; margin-top: 4px; padding: 7px 10px; resize: vertical; border: 1px solid #d8dee8; border-radius: 8px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
                             ></textarea>
-                            <div id="glossary-status" style="margin-top: 6px; font-size: 12px; opacity: 0.72;"></div>
-                            <div style="margin-top: 6px; font-size: 12px; opacity: 0.72; line-height: 1.55;">
-                                固定术语优先级最高，按原词精确匹配；出现多少次就展开多少次。自动注释只负责术语表之外的陌生软件名、项目名、缩写和技术词；模型不确定时会保留原词而不是强行解释。
+                            <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; font-size: 11px; opacity: 0.68; line-height: 1.35;">
+                                <span>精确匹配；每次出现都按术语表展开。自动注释只补充表外术语。</span>
+                                <span id="glossary-status" style="white-space: nowrap;"></span>
                             </div>
                         </div>
                     </div>
