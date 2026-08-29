@@ -23,9 +23,9 @@ jobs:
         run: |
           set -euo pipefail
           SCAN_PATHS=(packages/lightrans/src packages/lightrans/config packages/translators/src)
-          FORBIDDEN='trans\.hin\.cool|X-Lightrans-Token|RELAY_TOKEN|UseGoogleAnalytics|deepl_injector|VITE_SILICONFLOW_API_KEY'
+          FORBIDDEN='trans\.hin\.cool|X-Lightrans-Token|RELAY_TOKEN|UseGoogleAnalytics|deepl_injector|VITE_SILICONFLOW_API_KEY|generativelanguage\.googleapis\.com'
           if grep -R -n -E "$FORBIDDEN" "${SCAN_PATHS[@]}"; then
-            echo "Forbidden relay/analytics/legacy integration found in source."
+            echo "Forbidden relay/analytics/removed-provider integration found in source."
             exit 1
           fi
           if grep -R -n 'setting-path="ApiKey"' packages/lightrans/src; then
@@ -33,7 +33,8 @@ jobs:
             exit 1
           fi
           grep -q 'https://api.siliconflow.cn/v1/chat/completions' packages/translators/src/translators/aitrans.ts
-          grep -q 'https://generativelanguage.googleapis.com/v1beta/models' packages/translators/src/translators/aitrans.ts
+          grep -q 'GlossaryText' packages/translators/src/translators/aitrans.ts
+          grep -q 'ZXQTERM' packages/translators/src/translators/aitrans.ts
 
       - name: Install translator dependencies
         run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
