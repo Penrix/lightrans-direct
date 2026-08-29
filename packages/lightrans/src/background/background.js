@@ -8,7 +8,6 @@ import {
 } from "./library/blacklist.js";
 import { promiseTabs } from "common/scripts/promise.js";
 import Channel from "common/scripts/channel.js";
-import { getDomain } from "common/scripts/common.js";
 import { BROWSER_LANGUAGES_MAP } from "common/scripts/languages.js";
 import { DEFAULT_SETTINGS, setDefaultSettings } from "common/scripts/settings.js";
 
@@ -108,6 +107,21 @@ const channel = new Channel();
 const TRANSLATOR_MANAGER = new TranslatorManager(channel);
 
 /**
+ * Keep the page-translation context menu in sync with the active provider.
+ * TranslatorManager updates its provider from the same storage event; a short
+ * delay lets that update settle before rebuilding the provider-specific menu.
+ */
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes.TranslationService) {
+        setTimeout(() => {
+            TRANSLATOR_MANAGER.config_loader
+                .then(() => TRANSLATOR_MANAGER.updateTranslatePageMenu())
+                .catch(() => {});
+        }, 120);
+    }
+});
+
+/**
  * Handle extension context-menu actions.
  */
 try {
@@ -194,6 +208,16 @@ channel.provide("get_lang", () => {
     return Promise.resolve({
         lang: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()],
     });
+});
+
+/**
+ * Explicit popup action for translating the active page with the currently
+ * selected provider/model. This uses the same path as the right-click menu.
+ */
+channel.provide("translate_current_page", async (params) => {
+    await TRANSLATOR_MANAGER.config_loader;
+    translatePage(channel, params && params.model ? params.model : undefined);
+    return { started: true };
 });
 
 /**
