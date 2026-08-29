@@ -18,6 +18,23 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Guard direct-provider privacy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCAN_PATHS=(packages/lightrans/src packages/lightrans/config packages/translators/src)
+          FORBIDDEN='trans\.hin\.cool|X-Lightrans-Token|RELAY_TOKEN|UseGoogleAnalytics|deepl_injector|VITE_SILICONFLOW_API_KEY'
+          if grep -R -n -E "$FORBIDDEN" "${SCAN_PATHS[@]}"; then
+            echo "Forbidden relay/analytics/legacy integration found in source."
+            exit 1
+          fi
+          if grep -R -n 'setting-path="ApiKey"' packages/lightrans/src; then
+            echo "API Key must not be handled by synced generic settings."
+            exit 1
+          fi
+          grep -q 'https://api.siliconflow.cn/v1/chat/completions' packages/translators/src/translators/aitrans.ts
+          grep -q 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions' packages/translators/src/translators/aitrans.ts
+
       - name: Install translator dependencies
         run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
 
@@ -32,3 +49,19 @@ jobs:
 
       - name: Build Firefox extension
         run: npm run build:firefox --prefix packages/lightrans
+
+      - name: Upload Chrome build
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightrans-direct-chrome
+          path: packages/lightrans/build/chrome
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Firefox build
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightrans-direct-firefox
+          path: packages/lightrans/build/firefox
+          if-no-files-found: error
+          retention-days: 14
