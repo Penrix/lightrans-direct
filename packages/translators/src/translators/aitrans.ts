@@ -1,27 +1,32 @@
 import { TranslationResult } from "../types";
 
-type Provider = "siliconflow" | "gemini";
+type GlossaryEntry = {
+    source: string;
+    display: string;
+};
+
+type TranslationPreferences = {
+    glossaryEnabled: boolean;
+    autoAnnotateTerms: boolean;
+    glossary: GlossaryEntry[];
+};
 
 class AITranslator {
     private static readonly SILICONFLOW_ENDPOINT =
         "https://api.siliconflow.cn/v1/chat/completions";
-    private static readonly GEMINI_BASE_ENDPOINT =
-        "https://generativelanguage.googleapis.com/v1beta/models";
 
-    private static readonly MODELS: Record<Provider, string[]> = {
-        siliconflow: [
-            "tencent/Hunyuan-MT-7B",
-            "THUDM/GLM-4-9B-0414",
-            "Qwen/Qwen3.5-4B",
-        ],
-        gemini: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
-    };
+    private static readonly MODELS = [
+        "THUDM/GLM-4-9B-0414",
+        "tencent/Hunyuan-MT-7B",
+        "Qwen/Qwen3.5-4B",
+    ];
 
     private static readonly REQUEST_TIMEOUT_MS = 20000;
+    private static readonly DEFAULT_GLOSSARY =
+        "Obsidian = Obsidian（笔记与知识管理软件）";
 
-    private provider: Provider = "siliconflow";
     private apiKey = "";
-    private currentModel = "tencent/Hunyuan-MT-7B";
+    private currentModel = "THUDM/GLM-4-9B-0414";
 
     async detect(text: string): Promise<string> {
         if (/[\u4e00-\u9fa5]/.test(text)) {
@@ -34,8 +39,11 @@ class AITranslator {
     }
 
     /**
-     * Direct provider request. No developer relay, shared token, analytics endpoint,
-     * or account backend is involved in this path.
+     * Translate directly through SiliconFlow. User-defined glossary entries are
+     * protected with deterministic placeholder tokens before text reaches the model,
+     * then restored after generation. This makes an entry such as
+     * "Obsidian = Obsidian（笔记与知识管理软件）" appear the same way on every occurrence
+     * instead of relying on the model to remember a prompt-level convention.
      */
     private async requestTranslate(
         from: string,
@@ -45,44 +53,45 @@ class AITranslator {
         batch = false
     ): Promise<string> {
         const apiKey = await this.resolveApiKey();
-        const providerName = this.provider === "gemini" ? "Gemini" : "SiliconFlow";
         if (!apiKey) {
-            throw new Error(`请先填写 ${providerName} API Key`);
+            throw new Error("请先填写 SiliconFlow API Key");
         }
 
         const model = this.getSafeModel();
+        const preferences = await this.resolveTranslationPreferences();
+        const protectedText = preferences.glossaryEnabled
+            ? AITranslator.protectGlossary(text, preferences.glossary)
+            : { text, replacements: [] as Array<{ token: string; display: string }> };
+
+        const terminologyInstruction = AITranslator.isChineseTarget(to) && preferences.autoAnnotateTerms
+            ? " For English software/product/project names, technical acronyms, and specialized terms that remain in English, append a short Chinese explanation in full-width parentheses EVERY time the term appears, for example Obsidian（笔记与知识管理软件）. If you are unsure what a proper noun means, keep it unchanged and do not invent an explanation."
+            : "";
+        const glossaryInstruction = protectedText.replacements.length > 0
+            ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written; never translate, remove, split, or alter those tokens."
+            : "";
+
         const systemPrompt = batch
-            ? `You are a professional translator. Translate each numbered text segment (delimited by tags like <1>, <2>) from ${from} to ${to}. Keep exactly the same tag format in your output, one translated segment per tag. Do not merge, split, add or remove any segments. Return only the tagged translations.`
-            : `You are a professional translator. Translate the following text from ${from} to ${to}. Preserve meaning, tone, names and formatting. Only return the translated text, no explanations.`;
+            ? `Translate each numbered segment from ${from} to ${to}. Keep every <N> tag exactly and return only tagged translations.${terminologyInstruction}${glossaryInstruction}`
+            : `Translate the text from ${from} to ${to}. Preserve meaning, tone, names and formatting. Return only the translation.${terminologyInstruction}${glossaryInstruction}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
 
         try {
-            if (this.provider === "gemini") {
-                return await this.requestGeminiNative(
-                    model,
-                    apiKey,
-                    systemPrompt,
-                    text,
-                    maxTokens,
-                    controller.signal
-                );
-            }
-
-            return await this.requestSiliconFlow(
+            const translated = await this.requestSiliconFlow(
                 model,
                 apiKey,
                 systemPrompt,
-                text,
+                protectedText.text,
                 maxTokens,
                 controller.signal
             );
+            return AITranslator.restoreGlossary(translated, protectedText.replacements);
         } catch (error) {
             const candidate = error as { name?: string; message?: string };
             if (candidate?.name === "AbortError") {
                 throw new Error(
-                    `${providerName} 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
+                    `SiliconFlow 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
                     "请切换其它模型或检查当前网络/代理。"
                 );
             }
@@ -129,84 +138,6 @@ class AITranslator {
         return translated;
     }
 
-    /**
-     * Use Gemini's native generateContent endpoint rather than its OpenAI
-     * compatibility layer. Google recommends native Gemini API calls when OpenAI
-     * library compatibility is not required. Translation is latency-sensitive, so
-     * Gemini 3.x thinking is explicitly kept at the lowest supported level.
-     */
-    private async requestGeminiNative(
-        model: string,
-        apiKey: string,
-        systemPrompt: string,
-        text: string,
-        maxTokens: number,
-        signal: AbortSignal
-    ): Promise<string> {
-        const generationConfig: Record<string, unknown> = {
-            temperature: 0.2,
-            maxOutputTokens: maxTokens,
-        };
-
-        const thinkingLevel = AITranslator.geminiThinkingLevel(model);
-        if (thinkingLevel) {
-            generationConfig.thinkingConfig = { thinkingLevel };
-        }
-
-        const body = {
-            systemInstruction: {
-                parts: [{ text: systemPrompt }],
-            },
-            contents: [
-                {
-                    role: "user",
-                    parts: [{ text }],
-                },
-            ],
-            generationConfig,
-        };
-
-        const endpoint =
-            `${AITranslator.GEMINI_BASE_ENDPOINT}/${encodeURIComponent(model)}:generateContent`;
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-goog-api-key": apiKey,
-            },
-            body: JSON.stringify(body),
-            signal,
-        });
-
-        const data = await AITranslator.readJsonResponse(response, "Gemini");
-        const parts = data?.candidates?.[0]?.content?.parts;
-        const translated = Array.isArray(parts)
-            ? parts
-                .filter((part: any) => !part?.thought && typeof part?.text === "string")
-                .map((part: any) => part.text)
-                .join("")
-                .trim()
-            : "";
-
-        if (!translated) {
-            const finishReason = data?.candidates?.[0]?.finishReason;
-            const blockReason = data?.promptFeedback?.blockReason;
-            const reason = blockReason || finishReason;
-            throw new Error(
-                reason ? `Gemini 返回了空译文（${reason}）` : "Gemini 返回了空译文"
-            );
-        }
-        return translated;
-    }
-
-    private static geminiThinkingLevel(model: string): "minimal" | "low" | null {
-        if (model === "gemini-3.7-flash") return "low";
-        if (model === "gemini-3.5-flash" || model === "gemini-3.5-flash-lite") {
-            return "minimal";
-        }
-        return null;
-    }
-
     private static async readJsonResponse(response: Response, providerName: string): Promise<any> {
         const raw = await response.text();
         let data: any = {};
@@ -239,11 +170,6 @@ class AITranslator {
         return fallback || "Unknown provider error";
     }
 
-    /**
-     * Read the currently selected provider key directly from local-only browser storage.
-     * Reading at request time means changing a key in the options page takes effect
-     * immediately without copying secrets into sync storage or messaging them around.
-     */
     private async resolveApiKey(): Promise<string> {
         try {
             const runtime = globalThis as unknown as {
@@ -261,12 +187,114 @@ class AITranslator {
             return await new Promise<string>((resolve) => {
                 localStorage.get(["ProviderSecrets"], (result) => {
                     const providerSecrets = result.ProviderSecrets as Record<string, string> | undefined;
-                    resolve((providerSecrets?.[this.provider] || this.apiKey || "").trim());
+                    resolve((providerSecrets?.siliconflow || this.apiKey || "").trim());
                 });
             });
         } catch {
             return this.apiKey;
         }
+    }
+
+    private async resolveTranslationPreferences(): Promise<TranslationPreferences> {
+        const fallback: TranslationPreferences = {
+            glossaryEnabled: true,
+            autoAnnotateTerms: true,
+            glossary: AITranslator.parseGlossary(AITranslator.DEFAULT_GLOSSARY),
+        };
+
+        try {
+            const runtime = globalThis as unknown as {
+                chrome?: {
+                    storage?: {
+                        sync?: {
+                            get: (keys: string[], callback: (result: Record<string, unknown>) => void) => void;
+                        };
+                    };
+                };
+            };
+            const syncStorage = runtime.chrome?.storage?.sync;
+            if (!syncStorage) return fallback;
+
+            return await new Promise<TranslationPreferences>((resolve) => {
+                syncStorage.get(
+                    ["GlossaryEnabled", "AutoAnnotateTerms", "GlossaryText"],
+                    (result) => {
+                        const glossaryText = typeof result.GlossaryText === "string"
+                            ? result.GlossaryText
+                            : AITranslator.DEFAULT_GLOSSARY;
+                        resolve({
+                            glossaryEnabled: result.GlossaryEnabled !== false,
+                            autoAnnotateTerms: result.AutoAnnotateTerms !== false,
+                            glossary: AITranslator.parseGlossary(glossaryText),
+                        });
+                    }
+                );
+            });
+        } catch {
+            return fallback;
+        }
+    }
+
+    private static parseGlossary(text: string): GlossaryEntry[] {
+        const entries: GlossaryEntry[] = [];
+        const seen = new Set<string>();
+
+        for (const rawLine of (text || "").split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (!line || line.startsWith("#")) continue;
+
+            let separatorIndex = line.indexOf("=>");
+            let separatorLength = 2;
+            if (separatorIndex < 0) {
+                separatorIndex = line.indexOf("=");
+                separatorLength = 1;
+            }
+            if (separatorIndex <= 0) continue;
+
+            const source = line.slice(0, separatorIndex).trim();
+            const display = line.slice(separatorIndex + separatorLength).trim();
+            if (!source || !display || seen.has(source)) continue;
+
+            seen.add(source);
+            entries.push({ source, display });
+            if (entries.length >= 200) break;
+        }
+
+        return entries.sort((a, b) => b.source.length - a.source.length);
+    }
+
+    private static protectGlossary(
+        text: string,
+        glossary: GlossaryEntry[]
+    ): { text: string; replacements: Array<{ token: string; display: string }> } {
+        let protectedText = text;
+        const replacements: Array<{ token: string; display: string }> = [];
+        let tokenIndex = 0;
+
+        for (const entry of glossary) {
+            if (!protectedText.includes(entry.source)) continue;
+            const token = `ZXQTERM${String(tokenIndex).padStart(4, "0")}QXZ`;
+            protectedText = protectedText.split(entry.source).join(token);
+            replacements.push({ token, display: entry.display });
+            tokenIndex++;
+        }
+
+        return { text: protectedText, replacements };
+    }
+
+    private static restoreGlossary(
+        text: string,
+        replacements: Array<{ token: string; display: string }>
+    ): string {
+        let restored = text;
+        for (const replacement of replacements) {
+            restored = restored.split(replacement.token).join(replacement.display);
+        }
+        return restored;
+    }
+
+    private static isChineseTarget(language: string): boolean {
+        return /^zh(?:-|$)/i.test(language || "");
     }
 
     async translate(text: string, from: string, to: string): Promise<TranslationResult> {
@@ -402,35 +430,28 @@ class AITranslator {
 
     private getSafeModel(): string {
         const model = (this.currentModel || "").trim();
-        if (model) return model;
-        return AITranslator.MODELS[this.provider][0];
+        return model || AITranslator.MODELS[0];
     }
 
-    getAvailableModels(provider?: string): string[] {
-        const selected = AITranslator.normalizeProvider(provider || this.provider);
-        return [...AITranslator.MODELS[selected]];
+    getAvailableModels(_provider?: string): string[] {
+        return [...AITranslator.MODELS];
     }
 
-    getDefaultModel(provider?: string): string {
-        const selected = AITranslator.normalizeProvider(provider || this.provider);
-        return AITranslator.MODELS[selected][0];
+    getDefaultModel(_provider?: string): string {
+        return AITranslator.MODELS[0];
     }
 
-    setProvider(provider: string): void {
-        this.provider = AITranslator.normalizeProvider(provider);
-        const allowed = AITranslator.MODELS[this.provider];
-        if (!this.currentModel || !allowed.includes(this.currentModel)) {
-            this.currentModel = allowed[0];
-        }
+    setProvider(_provider: string): void {
+        // Compatibility shim: Lightrans Direct now intentionally uses SiliconFlow only.
     }
 
     getProvider(): string {
-        return this.provider;
+        return "siliconflow";
     }
 
-    /** Compatibility shim for upstream Lightrans' existing manager. */
-    setServiceMode(mode: string): void {
-        this.setProvider(mode === "gemini" ? "gemini" : "siliconflow");
+    /** Compatibility shim for upstream Lightrans' manager. */
+    setServiceMode(_mode: string): void {
+        // SiliconFlow is the only supported direct provider.
     }
 
     setApiKey(key: string): void {
@@ -447,10 +468,6 @@ class AITranslator {
 
     getCurrentModel(): string {
         return this.currentModel;
-    }
-
-    private static normalizeProvider(provider: string): Provider {
-        return provider === "gemini" ? "gemini" : "siliconflow";
     }
 }
 
