@@ -33,11 +33,12 @@ const DEFAULT_SETTINGS = {
     PageTranslationDisplayMode: "translated",
     CustomModel: false,
     CustomModelName: "",
-    // Deterministic terminology layer. Every exact occurrence of a source term is
-    // replaced with its configured display text after translation.
+    // Deterministic terminology layer. The glossary starts empty: software/product
+    // names are normally preserved as proper names, while automatic annotation is
+    // aimed at technical concepts, domain nouns and acronyms that benefit from a gloss.
     GlossaryEnabled: true,
     AutoAnnotateTerms: true,
-    GlossaryText: "Obsidian = Obsidian（笔记与知识管理软件）",
+    GlossaryText: "",
     HybridTranslatorConfig: {
         translators: ["AITrans"],
         selections: {
@@ -58,6 +59,8 @@ const DEFAULT_SECRETS = {
         siliconflow: "",
     },
 };
+
+const LEGACY_OBSIDIAN_GLOSSARY = "Obsidian = Obsidian（笔记与知识管理软件）";
 
 function setDefaultSettings(result, settings) {
     for (let i in settings) {
@@ -130,6 +133,18 @@ function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
             }
             if (typeof stored.AIModel === "string" && /^gemini-/i.test(stored.AIModel)) {
                 stored.AIModel = "THUDM/GLM-4-9B-0414";
+                updated = true;
+            }
+
+            // v1 briefly shipped an Obsidian software-name annotation as the default
+            // glossary. Remove only that exact untouched default; user-edited glossary
+            // content is preserved.
+            if (
+                requested.includes("GlossaryText") &&
+                typeof stored.GlossaryText === "string" &&
+                stored.GlossaryText.trim() === LEGACY_OBSIDIAN_GLOSSARY
+            ) {
+                stored.GlossaryText = "";
                 updated = true;
             }
 
