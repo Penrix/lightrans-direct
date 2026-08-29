@@ -22,9 +22,6 @@ class AITranslator {
     private apiKey = "";
     private currentModel = "tencent/Hunyuan-MT-7B";
 
-    /**
-     * Lightweight language detection for the existing mutual-translation behavior.
-     */
     async detect(text: string): Promise<string> {
         if (/[\u4e00-\u9fa5]/.test(text)) {
             return "zh-CN";
@@ -46,7 +43,8 @@ class AITranslator {
         maxTokens: number,
         batch = false
     ): Promise<string> {
-        if (!this.apiKey) {
+        const apiKey = await this.resolveApiKey();
+        if (!apiKey) {
             const providerName = this.provider === "gemini" ? "Gemini" : "SiliconFlow";
             throw new Error(`请先填写 ${providerName} API Key`);
         }
@@ -58,7 +56,7 @@ class AITranslator {
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
         };
 
         const commonBody: Record<string, unknown> = {
@@ -71,8 +69,6 @@ class AITranslator {
             max_tokens: maxTokens,
         };
 
-        // SiliconFlow supports model-specific parameters that Gemini's OpenAI-compat
-        // endpoint may reject. Keep provider request bodies intentionally separate.
         const body = this.provider === "siliconflow"
             ? {
                 ...commonBody,
@@ -87,6 +83,36 @@ class AITranslator {
             throw new Error(`${this.provider} returned an empty translation`);
         }
         return translated;
+    }
+
+    /**
+     * Read the currently selected provider key directly from local-only browser storage.
+     * Reading at request time means changing a key in the options page takes effect
+     * immediately without copying secrets into sync storage or messaging them around.
+     */
+    private async resolveApiKey(): Promise<string> {
+        try {
+            const runtime = globalThis as unknown as {
+                chrome?: {
+                    storage?: {
+                        local?: {
+                            get: (keys: string[], callback: (result: Record<string, unknown>) => void) => void;
+                        };
+                    };
+                };
+            };
+            const localStorage = runtime.chrome?.storage?.local;
+            if (!localStorage) return this.apiKey;
+
+            return await new Promise<string>((resolve) => {
+                localStorage.get(["ProviderSecrets"], (result) => {
+                    const providerSecrets = result.ProviderSecrets as Record<string, string> | undefined;
+                    resolve((providerSecrets?.[this.provider] || this.apiKey || "").trim());
+                });
+            });
+        } catch {
+            return this.apiKey;
+        }
     }
 
     async translate(text: string, from: string, to: string): Promise<TranslationResult> {
@@ -106,11 +132,6 @@ class AITranslator {
         }
     }
 
-    /**
-     * Batch short text fragments into one provider request and preserve segment ids.
-     * Transient failures are returned to the caller for backoff instead of exploding
-     * one failed batch into many requests.
-     */
     async translateBatch(texts: string[], from: string, to: string): Promise<string[]> {
         if (texts.length === 0) return [];
 
@@ -253,9 +274,7 @@ class AITranslator {
         return this.provider;
     }
 
-    /**
-     * Compatibility shim for code/settings from upstream Lightrans.
-     */
+    /** Compatibility shim for upstream Lightrans' existing manager. */
     setServiceMode(mode: string): void {
         this.setProvider(mode === "gemini" ? "gemini" : "siliconflow");
     }
