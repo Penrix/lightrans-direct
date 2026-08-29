@@ -1,181 +1,180 @@
 import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
-import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
+import {
+    DEFAULT_SETTINGS,
+    getOrSetDefaultSettings,
+    getOrSetLocalSecrets,
+    setProviderSecret,
+} from "common/scripts/settings.js";
 
-/**
- * Communication channel.
- */
 const channel = new Channel();
 
-/**
- * 初始化设置列表
- */
-window.onload = () => {
-    i18nHTML();
-
-    /**
-     * 初始化AI模型下拉菜单
-     */
-    getOrSetDefaultSettings(["AIModel"], DEFAULT_SETTINGS).then(
-        async (result) => {
-            let defaultAIModel = result.AIModel;
-            
-            // 获取可用的AI模型
-            const availableAIModels = await channel.request("get_available_ai_models", {});
-            
-            // 初始化AI模型下拉菜单
-            const aiModelSelect = document.getElementById("ai-model");
-            
-            // 移除已有的选项
-            aiModelSelect.innerHTML = "";
-            
-            // 添加可用的AI模型
-            for (let model of availableAIModels) {
-                const option = document.createElement("option");
-                option.value = model;
-                option.textContent = model;
-                if (model === defaultAIModel) {
-                    option.selected = true;
-                }
-                aiModelSelect.appendChild(option);
-            }
-        }
-    );
-
-    /**
-     * initiate and update settings
-     * attribute "setting-type": indicate the setting type of one option
-     * attribute "setting-path": indicate the nested setting path. used to locate the path of one setting item in chrome storage
-     */
-    getOrSetDefaultSettings(undefined, DEFAULT_SETTINGS).then((result) => {
-        let inputElements = document.getElementsByTagName("input");
-        const selectElements = document.querySelectorAll("select[setting-type='select']");
-        for (let element of [...inputElements, ...selectElements]) {
-            let settingItemPath = element.getAttribute("setting-path").split(/\s/g);
-            let settingItemValue = getSetting(result, settingItemPath);
-
-            switch (element.getAttribute("setting-type")) {
-                case "checkbox":
-                    element.checked = settingItemValue.indexOf(element.value) !== -1;
-                    // update setting value
-                    element.onchange = (event) => {
-                        const target = event.target;
-                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
-                        const settingItemValue = getSetting(result, settingItemPath);
-
-                        // if user checked this option, add value to setting array
-                        if (target.checked) settingItemValue.push(target.value);
-                        // if user unchecked this option, delete value from setting array
-                        else settingItemValue.splice(settingItemValue.indexOf(target.value), 1);
-                        saveOption(result, settingItemPath, settingItemValue);
-                    };
-                    break;
-                case "radio":
-                    element.checked = settingItemValue === element.value;
-                    // update setting value
-                    element.onchange = (event) => {
-                        const target = event.target;
-                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
-                        if (target.checked) {
-                            saveOption(result, settingItemPath, target.value);
-                        }
-                    };
-                    break;
-                case "switch":
-                    element.checked = settingItemValue;
-                    // update setting value
-                    element.onchange = (event) => {
-                        const settingItemPath = event.target
-                            .getAttribute("setting-path")
-                            .split(/\s/g);
-                        saveOption(result, settingItemPath, event.target.checked);
-                    };
-                    break;
-                case "select":
-                    element.value = settingItemValue;
-                    // update setting value
-                    element.onchange = (event) => {
-                        const target = event.target;
-                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
-                        saveOption(
-                            result,
-                            settingItemPath,
-                            target.options[target.selectedIndex].value
-                        );
-                    };
-                    break;
-                case "text":
-                    element.value = settingItemValue || "";
-                    // update setting value
-                    element.oninput = (event) => {
-                        const target = event.target;
-                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
-                        saveOption(result, settingItemPath, target.value);
-                    };
-                    break;
-                case "password":
-                    element.value = settingItemValue || "";
-                    // update setting value
-                    element.oninput = (event) => {
-                        const target = event.target;
-                        const settingItemPath = target.getAttribute("setting-path").split(/\s/g);
-                        saveOption(result, settingItemPath, target.value);
-                    };
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // 服务模式切换：自定义模式显示 API Key 与「自定义」选项，免费模式隐藏
-        const serviceSelect = document.getElementById("translation-service");
-        const apiKeyRow = document.getElementById("apikey-row");
-        const customModelCol = document.getElementById("custom-model-col");
-        const customModelCheckbox = document.getElementById("custom-model");
-        const aiModelSelect = document.getElementById("ai-model");
-        const aiModelInput = document.getElementById("ai-model-input");
-
-        // 「自定义」勾选时：隐藏模型下拉、显示同位可编辑输入框（不额外占行）
-        const syncCustomModelVisibility = () => {
-            if (!customModelCheckbox) return;
-            const checked = customModelCheckbox.checked;
-            if (aiModelSelect) aiModelSelect.style.display = checked ? "none" : "";
-            if (aiModelInput) aiModelInput.style.display = checked ? "" : "none";
-        };
-
-        const syncServiceVisibility = () => {
-            if (!serviceSelect) return;
-            const isCustom = (serviceSelect.value === "custom");
-            if (apiKeyRow) apiKeyRow.style.display = isCustom ? "" : "none";
-            if (customModelCol) customModelCol.style.display = isCustom ? "" : "none";
-            if (!isCustom) {
-                // 切回免费模式：恢复下拉、隐藏输入
-                if (aiModelSelect) aiModelSelect.style.display = "";
-                if (aiModelInput) aiModelInput.style.display = "none";
-            } else {
-                syncCustomModelVisibility();
-            }
-        };
-
-        if (serviceSelect) {
-            syncServiceVisibility();
-            serviceSelect.addEventListener("change", syncServiceVisibility);
-        }
-        if (customModelCheckbox) {
-            syncCustomModelVisibility();
-            customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
-        }
-    });
+const PROVIDER_MODELS = {
+    siliconflow: [
+        "tencent/Hunyuan-MT-7B",
+        "THUDM/GLM-4-9B-0414",
+        "Qwen/Qwen3.5-4B",
+    ],
+    gemini: ["gemini-3.7-flash"],
 };
 
-/**
- *
- * get setting value according to path of setting item
- *
- * @param {Object} localSettings setting object stored in local
- * @param {Array} settingItemPath path of the setting item
- * @returns {*} setting value
- */
+window.onload = async () => {
+    i18nHTML();
+
+    const settings = await getOrSetDefaultSettings(undefined, DEFAULT_SETTINGS);
+    const localSecrets = await getOrSetLocalSecrets();
+
+    const serviceSelect = document.getElementById("translation-service");
+    const apiKeyInput = document.getElementById("api-key");
+    const apiKeyProviderLabel = document.getElementById("apikey-provider-label");
+    const privacyNote = document.getElementById("provider-privacy-note");
+    const customModelCol = document.getElementById("custom-model-col");
+    const customModelCheckbox = document.getElementById("custom-model");
+    const aiModelSelect = document.getElementById("ai-model");
+    const aiModelInput = document.getElementById("ai-model-input");
+
+    function currentProvider() {
+        return serviceSelect && serviceSelect.value === "gemini" ? "gemini" : "siliconflow";
+    }
+
+    function populateModels(provider, selectedModel) {
+        if (!aiModelSelect) return;
+        const models = PROVIDER_MODELS[provider] || PROVIDER_MODELS.siliconflow;
+        aiModelSelect.innerHTML = "";
+        for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model;
+            option.textContent = model;
+            aiModelSelect.appendChild(option);
+        }
+        aiModelSelect.value = models.includes(selectedModel) ? selectedModel : models[0];
+    }
+
+    function syncCustomModelVisibility() {
+        if (!customModelCheckbox) return;
+        const checked = customModelCheckbox.checked;
+        if (aiModelSelect) aiModelSelect.style.display = checked ? "none" : "";
+        if (aiModelInput) aiModelInput.style.display = checked ? "" : "none";
+    }
+
+    function syncProviderUi() {
+        const provider = currentProvider();
+        const providerName = provider === "gemini" ? "Gemini" : "SiliconFlow";
+        if (apiKeyProviderLabel) apiKeyProviderLabel.textContent = `${providerName} API Key：`;
+        if (apiKeyInput) {
+            apiKeyInput.value = localSecrets.ProviderSecrets[provider] || "";
+            apiKeyInput.placeholder = `仅保存在本机浏览器中的 ${providerName} API Key`;
+        }
+        if (privacyNote) {
+            privacyNote.textContent = provider === "gemini"
+                ? "Gemini 免费层：网页文本会直传 Google；Google 当前说明免费层内容可能用于改进产品。"
+                : "SiliconFlow：网页文本会直传 SiliconFlow；本扩展不经过开发者中继服务器。";
+        }
+        syncCustomModelVisibility();
+    }
+
+    populateModels(
+        settings.TranslationService === "gemini" ? "gemini" : "siliconflow",
+        settings.AIModel
+    );
+
+    const inputElements = document.getElementsByTagName("input");
+    const selectElements = document.querySelectorAll("select[setting-type='select']");
+    for (let element of [...inputElements, ...selectElements]) {
+        const type = element.getAttribute("setting-type");
+        const path = element.getAttribute("setting-path");
+        if (!type || !path) continue;
+
+        const settingItemPath = path.split(/\s/g);
+        const settingItemValue = getSetting(settings, settingItemPath);
+
+        switch (type) {
+            case "checkbox":
+                element.checked = settingItemValue.indexOf(element.value) !== -1;
+                element.onchange = (event) => {
+                    const target = event.target;
+                    const targetPath = target.getAttribute("setting-path").split(/\s/g);
+                    const currentValue = getSetting(settings, targetPath);
+                    if (target.checked) currentValue.push(target.value);
+                    else currentValue.splice(currentValue.indexOf(target.value), 1);
+                    saveOption(settings, targetPath, currentValue);
+                };
+                break;
+            case "radio":
+                element.checked = settingItemValue === element.value;
+                element.onchange = (event) => {
+                    const target = event.target;
+                    if (target.checked) {
+                        saveOption(settings, target.getAttribute("setting-path").split(/\s/g), target.value);
+                    }
+                };
+                break;
+            case "switch":
+                element.checked = settingItemValue;
+                element.onchange = (event) => {
+                    const target = event.target;
+                    saveOption(settings, target.getAttribute("setting-path").split(/\s/g), target.checked);
+                };
+                break;
+            case "select":
+                element.value = settingItemValue;
+                element.onchange = (event) => {
+                    const target = event.target;
+                    saveOption(
+                        settings,
+                        target.getAttribute("setting-path").split(/\s/g),
+                        target.options[target.selectedIndex].value
+                    );
+                };
+                break;
+            case "text":
+                element.value = settingItemValue || "";
+                element.oninput = (event) => {
+                    const target = event.target;
+                    saveOption(settings, target.getAttribute("setting-path").split(/\s/g), target.value);
+                };
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (serviceSelect) {
+        serviceSelect.value = settings.TranslationService === "gemini" ? "gemini" : "siliconflow";
+        serviceSelect.addEventListener("change", () => {
+            const provider = currentProvider();
+            const defaultModel = PROVIDER_MODELS[provider][0];
+            populateModels(provider, defaultModel);
+            saveOption(settings, ["AIModel"], defaultModel);
+            settings.AIModel = defaultModel;
+            syncProviderUi();
+        });
+    }
+
+    if (aiModelSelect) {
+        aiModelSelect.value = settings.AIModel;
+    }
+
+    if (customModelCheckbox) {
+        customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
+    }
+
+    if (apiKeyInput) {
+        let saveTimer = null;
+        apiKeyInput.addEventListener("input", () => {
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                const provider = currentProvider();
+                const key = apiKeyInput.value || "";
+                localSecrets.ProviderSecrets[provider] = key.trim();
+                await setProviderSecret(provider, key);
+            }, 250);
+        });
+    }
+
+    syncProviderUi();
+};
+
 function getSetting(localSettings, settingItemPath) {
     let result = localSettings;
     settingItemPath.forEach((key) => {
@@ -184,25 +183,14 @@ function getSetting(localSettings, settingItemPath) {
     return result;
 }
 
-/**
- * 保存一条设置项
- *
- * @param {Object} localSettings  本地存储的设置项
- * @param {Array} settingItemPath 设置项的层级路径
- * @param {*} value 设置项的值
- */
 function saveOption(localSettings, settingItemPath, value) {
-    // update local settings
-    let pointer = localSettings; // point to children of local setting or itself
-
-    // point to the leaf item recursively
+    let pointer = localSettings;
     for (let i = 0; i < settingItemPath.length - 1; i++) {
         pointer = pointer[settingItemPath[i]];
     }
-    // update the setting leaf value
     pointer[settingItemPath[settingItemPath.length - 1]] = value;
 
-    let result = {};
+    const result = {};
     result[settingItemPath[0]] = localSettings[settingItemPath[0]];
     chrome.storage.sync.set(result);
 }
