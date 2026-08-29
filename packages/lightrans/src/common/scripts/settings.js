@@ -26,13 +26,18 @@ const DEFAULT_SETTINGS = {
     },
     DefaultTranslator: "AITrans",
     DefaultPageTranslator: "AITrans",
-    // Reuses the upstream setting key, but values now mean direct providers instead of relay modes.
-    // siliconflow | gemini
+    // Kept for compatibility with the upstream settings shape. Lightrans Direct
+    // intentionally supports only direct SiliconFlow requests now.
     TranslationService: "siliconflow",
-    AIModel: "tencent/Hunyuan-MT-7B",
+    AIModel: "THUDM/GLM-4-9B-0414",
     PageTranslationDisplayMode: "translated",
     CustomModel: false,
     CustomModelName: "",
+    // Deterministic terminology layer. Every exact occurrence of a source term is
+    // replaced with its configured display text after translation.
+    GlossaryEnabled: true,
+    AutoAnnotateTerms: true,
+    GlossaryText: "Obsidian = Obsidian（笔记与知识管理软件）",
     HybridTranslatorConfig: {
         translators: ["AITrans"],
         selections: {
@@ -51,7 +56,6 @@ const DEFAULT_SETTINGS = {
 const DEFAULT_SECRETS = {
     ProviderSecrets: {
         siliconflow: "",
-        gemini: "",
     },
 };
 
@@ -115,9 +119,17 @@ function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
                 }
             }
 
-            // Normalize relay-era values without creating a new setting key.
-            if (stored.TranslationService === "free" || stored.TranslationService === "custom") {
+            // Normalize relay-era and removed-provider values.
+            if (
+                stored.TranslationService === "free" ||
+                stored.TranslationService === "custom" ||
+                stored.TranslationService === "gemini"
+            ) {
                 stored.TranslationService = "siliconflow";
+                updated = true;
+            }
+            if (typeof stored.AIModel === "string" && /^gemini-/i.test(stored.AIModel)) {
+                stored.AIModel = "THUDM/GLM-4-9B-0414";
                 updated = true;
             }
 
@@ -138,14 +150,19 @@ function getOrSetLocalSecrets() {
         chrome.storage.local.get(["ProviderSecrets"], (result) => {
             const secrets = result || {};
             setDefaultSettings(secrets, DEFAULT_SECRETS);
+            // Drop removed provider secrets instead of keeping unused API keys around.
+            secrets.ProviderSecrets = {
+                siliconflow: (secrets.ProviderSecrets && secrets.ProviderSecrets.siliconflow) || "",
+            };
             chrome.storage.local.set({ ProviderSecrets: secrets.ProviderSecrets }, () => resolve(secrets));
         });
     });
 }
 
 async function setProviderSecret(provider, key) {
+    if (provider !== "siliconflow") return Promise.resolve();
     const local = await getOrSetLocalSecrets();
-    local.ProviderSecrets[provider] = (key || "").trim();
+    local.ProviderSecrets.siliconflow = (key || "").trim();
     return new Promise((resolve) => {
         chrome.storage.local.set({ ProviderSecrets: local.ProviderSecrets }, resolve);
     });
