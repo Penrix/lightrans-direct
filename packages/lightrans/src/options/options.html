@@ -83,7 +83,7 @@
                     </div>
                 </div>
 
-                <label class="setting-title">术语注释</label>
+                <label class="setting-title">固定术语（可选）</label>
                 <div id="terminology-settings">
                     <div class="row">
                         <div class="column">
@@ -97,16 +97,8 @@
                             <span class="space"></span>
                             <label for="glossary-enabled" class="checked-label">启用固定术语表</label>
                         </div>
-                        <div class="column">
-                            <input
-                                type="checkbox"
-                                setting-type="switch"
-                                setting-path="AutoAnnotateTerms"
-                                class="switch"
-                                id="auto-annotate-terms"
-                            />
-                            <span class="space"></span>
-                            <label for="auto-annotate-terms" class="checked-label">自动给专业英文名词 / 技术术语加中文注释</label>
+                        <div class="column" style="font-size: 12px; opacity: 0.72; line-height: 1.4;">
+                            默认所有英文按普通翻译处理，不自动加注释。
                         </div>
                     </div>
                     <div class="row" style="padding-top: 2px; padding-bottom: 4px;">
@@ -118,11 +110,11 @@
                                 id="glossary-text"
                                 rows="2"
                                 spellcheck="false"
-                                placeholder="frontmatter = frontmatter（文档前置元数据）"
+                                placeholder="API = 应用程序编程接口"
                                 style="width: 100%; height: 54px; min-height: 54px; max-height: 160px; box-sizing: border-box; margin-top: 4px; padding: 7px 10px; resize: vertical; border: 1px solid #d8dee8; border-radius: 8px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
                             ></textarea>
                             <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; font-size: 11px; opacity: 0.68; line-height: 1.35;">
-                                <span>品牌/软件/公司/项目名默认原样保留；自动注释只处理有理解门槛的专业名词、术语和缩写。</span>
+                                <span>只有你手动填写的规则会覆盖普通翻译；模型不会自动生成“英文（中文解释）”。</span>
                                 <span id="glossary-status" style="white-space: nowrap;"></span>
                             </div>
                         </div>
