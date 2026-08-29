@@ -48,9 +48,6 @@ const DEFAULT_SETTINGS = {
     HidePageTranslatorBanner: false,
 };
 
-/**
- * Secrets are device-local by design. They are not written to chrome.storage.sync.
- */
 const DEFAULT_SECRETS = {
     ProviderSecrets: {
         siliconflow: "",
@@ -78,8 +75,8 @@ function setDefaultSettings(result, settings) {
 
 /**
  * Get synced settings and initialize missing defaults.
- * Legacy callers can still request ApiKey; it is returned as an empty compatibility
- * value and is never initialized in sync storage.
+ * If an upstream installation left ApiKey in sync storage, migrate it to the
+ * device-local SiliconFlow secret slot and delete the synced copy immediately.
  */
 function getOrSetDefaultSettings(settings, defaults) {
     return new Promise((resolve) => {
@@ -90,29 +87,45 @@ function getOrSetDefaultSettings(settings, defaults) {
         }
 
         const requested = settings;
-        const syncedSettings = requested.filter((key) => key !== "ApiKey");
+        const wantsLegacyApiKey = requested.includes("ApiKey");
+        const storageKeys = requested.filter((key) => key !== "ApiKey");
+        if (wantsLegacyApiKey) storageKeys.push("ApiKey");
 
-        chrome.storage.sync.get(syncedSettings, (result) => {
+        chrome.storage.sync.get(storageKeys, async (stored) => {
+            const legacyApiKey = (stored.ApiKey || "").trim();
+            delete stored.ApiKey;
+
+            if (legacyApiKey) {
+                const local = await getOrSetLocalSecrets();
+                if (!local.ProviderSecrets.siliconflow) {
+                    await setProviderSecret("siliconflow", legacyApiKey);
+                }
+                await new Promise((done) => chrome.storage.sync.remove(["ApiKey"], done));
+            }
+
             let updated = false;
-
-            for (let setting of syncedSettings) {
-                if (result[setting] === undefined) {
+            for (const setting of requested) {
+                if (setting === "ApiKey") continue;
+                if (stored[setting] === undefined) {
                     if (typeof defaults === "function") {
                         defaults = defaults(settings);
                     }
-                    result[setting] = defaults[setting];
+                    stored[setting] = defaults[setting];
                     updated = true;
                 }
             }
 
-            if (requested.includes("ApiKey")) {
-                result.ApiKey = "";
+            // Normalize relay-era values without creating a new setting key.
+            if (stored.TranslationService === "free" || stored.TranslationService === "custom") {
+                stored.TranslationService = "siliconflow";
+                updated = true;
             }
 
+            const result = { ...stored };
+            if (wantsLegacyApiKey) result.ApiKey = legacyApiKey;
+
             if (updated) {
-                const safeResult = { ...result };
-                delete safeResult.ApiKey;
-                chrome.storage.sync.set(safeResult, () => resolve(result));
+                chrome.storage.sync.set(stored, () => resolve(result));
             } else {
                 resolve(result);
             }
@@ -138,40 +151,9 @@ async function setProviderSecret(provider, key) {
     });
 }
 
-/**
- * One-time migration from upstream Lightrans, which stored the SiliconFlow key in sync.
- */
 function migrateLegacyApiKey() {
-    return new Promise((resolve) => {
-        chrome.storage.sync.get(["ApiKey", "TranslationService"], async (legacy) => {
-            const legacyKey = (legacy.ApiKey || "").trim();
-            if (legacyKey) {
-                const local = await getOrSetLocalSecrets();
-                if (!local.ProviderSecrets.siliconflow) {
-                    await setProviderSecret("siliconflow", legacyKey);
-                }
-            }
-
-            const updates = {};
-            if (legacy.TranslationService === "free" || legacy.TranslationService === "custom") {
-                updates.TranslationService = "siliconflow";
-            }
-
-            const finish = () => {
-                if (legacy.ApiKey !== undefined) {
-                    chrome.storage.sync.remove(["ApiKey"], () => resolve(!!legacyKey));
-                } else {
-                    resolve(false);
-                }
-            };
-
-            if (Object.keys(updates).length > 0) {
-                chrome.storage.sync.set(updates, finish);
-            } else {
-                finish();
-            }
-        });
-    });
+    return getOrSetDefaultSettings(["TranslationService", "ApiKey"], DEFAULT_SETTINGS)
+        .then((result) => !!result.ApiKey);
 }
 
 export {
