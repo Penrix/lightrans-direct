@@ -23,6 +23,8 @@ class AITranslator {
 
     private static readonly REQUEST_TIMEOUT_MS = 20000;
     private static readonly DEFAULT_GLOSSARY = "";
+    private static readonly LEGACY_SOFTWARE_GLOSSARY =
+        "Obsidian = Obsidian（笔记与知识管理软件）";
 
     private apiKey = "";
     private currentModel = "THUDM/GLM-4-9B-0414";
@@ -221,9 +223,12 @@ class AITranslator {
                 syncStorage.get(
                     ["GlossaryEnabled", "AutoAnnotateTerms", "GlossaryText"],
                     (result) => {
-                        const glossaryText = typeof result.GlossaryText === "string"
+                        let glossaryText = typeof result.GlossaryText === "string"
                             ? result.GlossaryText
                             : AITranslator.DEFAULT_GLOSSARY;
+                        if (glossaryText.trim() === AITranslator.LEGACY_SOFTWARE_GLOSSARY) {
+                            glossaryText = "";
+                        }
                         resolve({
                             glossaryEnabled: result.GlossaryEnabled !== false,
                             autoAnnotateTerms: result.AutoAnnotateTerms !== false,
