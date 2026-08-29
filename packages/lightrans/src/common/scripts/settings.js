@@ -78,7 +78,7 @@ function setDefaultSettings(result, settings) {
  * If an upstream installation left ApiKey in sync storage, migrate it to the
  * device-local SiliconFlow secret slot and delete the synced copy immediately.
  */
-function getOrSetDefaultSettings(settings, defaults) {
+function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
     return new Promise((resolve) => {
         if (typeof settings === "string") {
             settings = [settings];
