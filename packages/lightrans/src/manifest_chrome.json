@@ -17,15 +17,10 @@
         {
             "matches": ["<all_urls>"],
             "js": ["./content/banner_controller.js"]
-        },
-        {
-            "matches": ["*://*.deepl.com/*"],
-            "js": ["./content/deepl_injector.js"],
-            "all_frames": true
         }
     ],
     "content_security_policy": {
         "extension_pages": "script-src 'self'; object-src 'self'"
     },
-    "homepage_url": "https://github.com/W4J1e/Lightrans"
+    "homepage_url": "https://github.com/Penrix/lightrans-direct"
 }
