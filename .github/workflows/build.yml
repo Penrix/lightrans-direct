@@ -33,7 +33,7 @@ jobs:
             exit 1
           fi
           grep -q 'https://api.siliconflow.cn/v1/chat/completions' packages/translators/src/translators/aitrans.ts
-          grep -q 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions' packages/translators/src/translators/aitrans.ts
+          grep -q 'https://generativelanguage.googleapis.com/v1beta/models' packages/translators/src/translators/aitrans.ts
 
       - name: Install translator dependencies
         run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
