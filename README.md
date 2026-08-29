@@ -1,45 +1,63 @@
 # Lightrans Direct
 
-一个以“**直连 Provider、无开发者中继、API Key 不同步**”为核心原则的 Lightrans 分支。
+一个以“**直连 SiliconFlow、无开发者中继、API Key 不同步**”为核心原则的 Lightrans 分支。
 
-本项目保留 Lightrans / EdgeTranslate 已经成熟的划词翻译、弹窗翻译、整页翻译、PDF 等交互与页面处理能力，主要重做联网与密钥边界。
+本项目保留 Lightrans / EdgeTranslate 已经成熟的划词翻译、弹窗翻译、整页翻译、PDF 等交互与页面处理能力，主要重做联网与密钥边界，并增加可控的术语注释层。
 
 ## 数据流与隐私
 
-翻译请求只发送到你在设置中选择的 Provider：
+翻译请求只发送到 SiliconFlow：
 
-- **SiliconFlow**：`https://api.siliconflow.cn/v1/chat/completions`
-- **Gemini API**：`https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+- `https://api.siliconflow.cn/v1/chat/completions`
 
-Gemini 直接使用 Google 原生 `generateContent` API，不经过 OpenAI compatibility layer；Gemini 3.x 翻译请求会使用尽量低的 thinking level 以降低延迟。
-
-本分支不使用 Lightrans 原有的 `trans.hin.cool` 开发者中继，也不内置共享 Relay Token。
+本分支不使用 Lightrans 原有的 `trans.hin.cool` 开发者中继，也不内置共享 Relay Token。Gemini 已从正常产品路径移除。
 
 API Key 保存在 `chrome.storage.local` 的扩展本地存储中，不写入 `chrome.storage.sync`，因此不会通过 Chrome/Firefox 的扩展设置同步机制同步到其他设备。请注意：浏览器本地扩展存储不是操作系统密钥链，仍应使用专门的、权限与额度尽量受限的 API Key。
-
-### Gemini 免费层提醒
-
-Google 当前说明 Gemini Developer API 的免费层内容可能用于改进其产品；付费层则说明内容不用于改进产品。涉及敏感或私密网页时，请自行选择合适的 Provider / 计费层。
-
-官方参考：
-
-- Gemini native generateContent: https://ai.google.dev/api/generate-content
-- Gemini thinking configuration: https://ai.google.dev/gemini-api/docs/thinking
-- Gemini API pricing / data-use notes: https://ai.google.dev/gemini-api/docs/pricing
-- SiliconFlow Chat Completions: https://docs.siliconflow.cn/en/api-reference/chat-completions/chat-completions
 
 ## 默认配置
 
 - Provider：SiliconFlow
-- 模型：`tencent/Hunyuan-MT-7B`
+- 模型：`THUDM/GLM-4-9B-0414`
 - 目标语言：沿用浏览器 / 扩展原有语言设置
 - 页面翻译：仅译文
+- 固定术语表：启用
+- 自动术语注释：启用
 
-SiliconFlow 内置 `tencent/Hunyuan-MT-7B`、`THUDM/GLM-4-9B-0414`、`Qwen/Qwen3.5-4B` 三个当前官方 Lightrans 文档列出的免费模型。免费状态由 Provider 决定，未来可能变化。
+内置模型：
 
-Gemini 默认模型为 `gemini-3.5-flash-lite`，因为 Google 将其定位为低延迟、高吞吐，并明确针对翻译和简单数据处理优化；同时提供 `gemini-3.5-flash` 和 `gemini-3.7-flash`。这些模型当前的 Standard Free Tier 都提供免费输入/输出额度。
+- `THUDM/GLM-4-9B-0414`
+- `tencent/Hunyuan-MT-7B`
+- `Qwen/Qwen3.5-4B`
 
-也可以启用“自定义模型”，手动填写对应 Provider 支持的模型 ID。
+免费状态由 SiliconFlow 决定，未来可能变化。也可以启用“自定义模型”，手动填写 SiliconFlow 支持的模型 ID。
+
+## 术语注释
+
+Lightrans Direct 提供两层术语处理。
+
+### 固定术语表
+
+设置页可按每行一条的格式写规则：
+
+```text
+Obsidian = Obsidian（笔记与知识管理软件）
+Docker = Docker（容器化平台）
+MCP = MCP（模型上下文协议）
+```
+
+固定术语不依赖模型“记住提示词”。扩展会先把原词替换成受保护的占位符，模型翻译完成后再机械还原。因此同一术语在一页中出现多少次，就会按配置格式显示多少次。
+
+匹配目前采用原词精确匹配。固定术语优先级高于自动注释。
+
+### 自动术语注释
+
+启用后，当目标语言为中文时，模型会尝试对术语表之外的英文软件名、产品名、项目名、技术缩写和专业词添加简短中文说明，例如：
+
+```text
+Obsidian（笔记与知识管理软件）
+```
+
+如果模型不确定一个专有名词的含义，提示词要求保留原词而不是编造解释。对于必须保持完全一致的术语，仍建议加入固定术语表。
 
 ## 功能
 
@@ -50,9 +68,11 @@ Gemini 默认模型为 `gemini-3.5-flash-lite`，因为 Google 将其定位为�
 - 原文 / 译文 / 双语对照显示
 - PDF 翻译
 - 页面与域名黑名单
-- SiliconFlow / Gemini 直连
-- Provider / 模型可在弹窗直接切换
-- Provider API Key 本机保存
+- SiliconFlow 直连
+- 弹窗直接切换模型
+- API Key 本机保存
+- 固定术语表
+- 自动英文术语中文注释
 
 ## 安装开发版
 
@@ -63,7 +83,7 @@ Gemini 默认模型为 `gemini-3.5-flash-lite`，因为 Google 将其定位为�
 3. 开启“开发者模式”。
 4. 点击“加载已解压的扩展程序”。
 5. 选择构建生成的 Chrome 扩展目录。
-6. 打开扩展设置，选择 Provider 并填写对应 API Key。
+6. 打开扩展设置并填写 SiliconFlow API Key。
 
 ### Firefox
 
@@ -71,13 +91,13 @@ Gemini 默认模型为 `gemini-3.5-flash-lite`，因为 Google 将其定位为�
 2. 打开 `about:debugging#/runtime/this-firefox`。
 3. 点击“临时载入附加组件”。
 4. 选择 Firefox 构建目录中的 manifest。
-5. 打开扩展设置并填写 Provider API Key。
+5. 打开扩展设置并填写 SiliconFlow API Key。
 
 ## 开发
 
 仓库由两个主要 package 组成：
 
-- `packages/translators`：Provider / 翻译请求层
+- `packages/translators`：SiliconFlow / 翻译请求 / 术语保护层
 - `packages/lightrans`：浏览器扩展 UI、后台逻辑、页面注入与整页翻译
 
 ```bash
@@ -91,7 +111,7 @@ npm run build:chrome
 npm run build:firefox
 ```
 
-仓库内的 GitHub Actions 会对 Chrome 与 Firefox 构建进行验证。
+仓库内的 GitHub Actions 会验证隐私边界、translator 构建、Chrome 构建与 Firefox 构建，并生成可下载的构建产物。
 
 ## 与上游的关系
 
