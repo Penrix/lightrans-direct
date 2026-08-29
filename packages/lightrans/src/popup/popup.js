@@ -3,26 +3,19 @@ import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
 
-const PROVIDER_MODELS = {
-    siliconflow: [
-        "tencent/Hunyuan-MT-7B",
-        "THUDM/GLM-4-9B-0414",
-        "Qwen/Qwen3.5-4B",
-    ],
-    // In real browser testing, 3.5 Flash is the Gemini model that is currently
-    // responsive enough for interactive translation. Other model IDs remain
-    // available through the custom-model setting for experimentation.
-    gemini: ["gemini-3.5-flash"],
-};
+const MODELS = [
+    "THUDM/GLM-4-9B-0414",
+    "tencent/Hunyuan-MT-7B",
+    "Qwen/Qwen3.5-4B",
+];
 
 const channel = new Channel();
 
 let sourceLanguage = document.getElementById("sl");
 let targetLanguage = document.getElementById("tl");
 let exchangeButton = document.getElementById("exchange");
-let providerSelect = document.getElementById("provider");
 let modelSelect = document.getElementById("model");
-let providerSettingsPending = Promise.resolve();
+let modelSettingsPending = Promise.resolve();
 
 window.onload = async function () {
     i18nHTML();
@@ -41,7 +34,7 @@ window.onload = async function () {
     exchangeButton.onclick = exchangeLanguage;
 
     const settings = await getOrSetDefaultSettings(
-        ["languageSetting", "TranslationService", "AIModel"],
+        ["languageSetting", "AIModel", "TranslationService"],
         DEFAULT_SETTINGS
     );
     const popupStored = await getSyncStorage(["popupLanguageSetting"]);
@@ -59,20 +52,11 @@ window.onload = async function () {
         );
     }
 
-    const provider = settings.TranslationService === "gemini" ? "gemini" : "siliconflow";
-    providerSelect.value = provider;
-    populateModels(provider, settings.AIModel);
+    populateModels(settings.AIModel);
+    modelSelect.onchange = () => saveModel(modelSelect.value);
 
-    providerSelect.onchange = () => {
-        const selectedProvider = providerSelect.value === "gemini" ? "gemini" : "siliconflow";
-        const defaultModel = PROVIDER_MODELS[selectedProvider][0];
-        populateModels(selectedProvider, defaultModel);
-        saveProviderAndModel(selectedProvider, defaultModel);
-    };
-
-    modelSelect.onchange = () => {
-        saveProviderAndModel(providerSelect.value, modelSelect.value);
-    };
+    // Normalize old installs that had Gemini selected.
+    chrome.storage.sync.set({ TranslationService: "siliconflow" });
 
     showSourceTarget();
     judgeValue(exchangeButton, sourceLanguage);
@@ -83,27 +67,26 @@ function getSyncStorage(keys) {
     return new Promise((resolve) => chrome.storage.sync.get(keys, resolve));
 }
 
-function populateModels(provider, selectedModel) {
-    const models = PROVIDER_MODELS[provider] || PROVIDER_MODELS.siliconflow;
+function populateModels(selectedModel) {
     modelSelect.innerHTML = "";
-    for (const model of models) {
+    for (const model of MODELS) {
         modelSelect.options.add(new Option(model, model));
     }
-    modelSelect.value = models.includes(selectedModel) ? selectedModel : models[0];
+    modelSelect.value = MODELS.includes(selectedModel) ? selectedModel : MODELS[0];
 }
 
-function saveProviderAndModel(provider, model) {
-    providerSettingsPending = new Promise((resolve) => {
+function saveModel(model) {
+    modelSettingsPending = new Promise((resolve) => {
         chrome.storage.sync.set(
             {
-                TranslationService: provider,
+                TranslationService: "siliconflow",
                 AIModel: model,
                 CustomModel: false,
             },
             () => setTimeout(resolve, 80)
         );
     });
-    return providerSettingsPending;
+    return modelSettingsPending;
 }
 
 chrome.commands.onCommand.addListener((command) => {
@@ -133,10 +116,10 @@ function friendlyTranslateError(message) {
         return "SiliconFlow 返回 402：账户状态阻止 API 调用。请检查余额/欠费状态。";
     }
     if (/\b401\b|invalid.*key|api key.*invalid/i.test(message)) {
-        return "API Key 未通过认证（401）。请检查当前 Provider 对应的 Key 是否填写正确。";
+        return "SiliconFlow API Key 未通过认证（401）。请检查 Key 是否填写正确。";
     }
     if (/\b403\b|permission|forbidden/i.test(message)) {
-        return `Provider 拒绝访问（403）：${message}`;
+        return `SiliconFlow 拒绝访问（403）：${message}`;
     }
     if (/transient|429|rate\s*limit|status code 5\d{2}/i.test(message)) {
         return chrome.i18n.getMessage("MODEL_BUSY") || "该模型负载高，请使用其它模型或稍后重试。";
@@ -154,7 +137,7 @@ async function translateCurrentPage() {
     button.textContent = "正在启动…";
 
     try {
-        await providerSettingsPending;
+        await modelSettingsPending;
         const result = await channel.request("translate_current_page", {
             model: modelSelect.value,
         });
@@ -188,7 +171,7 @@ async function translateSubmit() {
     resultDiv.textContent = "翻译中...";
 
     try {
-        await providerSettingsPending;
+        await modelSettingsPending;
         const result = await channel.request("translate_in_popup", {
             text: content,
             sl: sourceLanguage.value,
@@ -200,7 +183,7 @@ async function translateSubmit() {
         } else if (result && result.mainMeaning) {
             resultDiv.textContent = result.mainMeaning;
         } else {
-            resultDiv.textContent = "翻译失败：Provider 未返回译文。";
+            resultDiv.textContent = "翻译失败：SiliconFlow 未返回译文。";
         }
     } catch (error) {
         resultDiv.textContent = friendlyTranslateError(String((error && error.message) || error));
