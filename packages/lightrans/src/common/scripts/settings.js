@@ -26,13 +26,11 @@ const DEFAULT_SETTINGS = {
     },
     DefaultTranslator: "AITrans",
     DefaultPageTranslator: "AITrans",
-    // Provider: siliconflow | gemini
-    TranslationProvider: "siliconflow",
-    // Shared active model. The options page replaces it with the provider default when provider changes.
+    // Reuses the upstream setting key, but values now mean direct providers instead of relay modes.
+    // siliconflow | gemini
+    TranslationService: "siliconflow",
     AIModel: "tencent/Hunyuan-MT-7B",
-    // Page translation display mode: original | translated | bilingual
     PageTranslationDisplayMode: "translated",
-    // Allow an arbitrary provider model id instead of the built-in list.
     CustomModel: false,
     CustomModelName: "",
     HybridTranslatorConfig: {
@@ -60,12 +58,6 @@ const DEFAULT_SECRETS = {
     },
 };
 
-/**
- * Assign default values recursively without overwriting existing values.
- *
- * @param {*} result stored settings
- * @param {*} settings defaults
- */
 function setDefaultSettings(result, settings) {
     for (let i in settings) {
         if (
@@ -86,10 +78,8 @@ function setDefaultSettings(result, settings) {
 
 /**
  * Get synced settings and initialize missing defaults.
- *
- * @param {String | Array<String>} settings setting names
- * @param {Object | Function} defaults default values
- * @returns {Promise<Any>} settings
+ * Legacy callers can still request ApiKey; it is returned as an empty compatibility
+ * value and is never initialized in sync storage.
  */
 function getOrSetDefaultSettings(settings, defaults) {
     return new Promise((resolve) => {
@@ -99,10 +89,13 @@ function getOrSetDefaultSettings(settings, defaults) {
             settings = Object.keys(defaults);
         }
 
-        chrome.storage.sync.get(settings, (result) => {
+        const requested = settings;
+        const syncedSettings = requested.filter((key) => key !== "ApiKey");
+
+        chrome.storage.sync.get(syncedSettings, (result) => {
             let updated = false;
 
-            for (let setting of settings) {
+            for (let setting of syncedSettings) {
                 if (result[setting] === undefined) {
                     if (typeof defaults === "function") {
                         defaults = defaults(settings);
@@ -112,8 +105,14 @@ function getOrSetDefaultSettings(settings, defaults) {
                 }
             }
 
+            if (requested.includes("ApiKey")) {
+                result.ApiKey = "";
+            }
+
             if (updated) {
-                chrome.storage.sync.set(result, () => resolve(result));
+                const safeResult = { ...result };
+                delete safeResult.ApiKey;
+                chrome.storage.sync.set(safeResult, () => resolve(result));
             } else {
                 resolve(result);
             }
@@ -121,11 +120,6 @@ function getOrSetDefaultSettings(settings, defaults) {
     });
 }
 
-/**
- * Read provider secrets from local-only extension storage.
- *
- * @returns {Promise<{ProviderSecrets: {siliconflow: string, gemini: string}}>} local secrets
- */
 function getOrSetLocalSecrets() {
     return new Promise((resolve) => {
         chrome.storage.local.get(["ProviderSecrets"], (result) => {
@@ -136,13 +130,6 @@ function getOrSetLocalSecrets() {
     });
 }
 
-/**
- * Save one provider API key locally. Never sync it through the browser account.
- *
- * @param {string} provider siliconflow | gemini
- * @param {string} key API key
- * @returns {Promise<void>} completion
- */
 async function setProviderSecret(provider, key) {
     const local = await getOrSetLocalSecrets();
     local.ProviderSecrets[provider] = (key || "").trim();
@@ -152,10 +139,7 @@ async function setProviderSecret(provider, key) {
 }
 
 /**
- * One-time migration from upstream Lightrans, which stored ApiKey in chrome.storage.sync.
- * The legacy key represented SiliconFlow only. Copy it locally, then remove the synced copy.
- *
- * @returns {Promise<boolean>} true when a key was migrated
+ * One-time migration from upstream Lightrans, which stored the SiliconFlow key in sync.
  */
 function migrateLegacyApiKey() {
     return new Promise((resolve) => {
@@ -168,14 +152,23 @@ function migrateLegacyApiKey() {
                 }
             }
 
-            const removals = [];
-            if (legacy.ApiKey !== undefined) removals.push("ApiKey");
-            if (legacy.TranslationService !== undefined) removals.push("TranslationService");
+            const updates = {};
+            if (legacy.TranslationService === "free" || legacy.TranslationService === "custom") {
+                updates.TranslationService = "siliconflow";
+            }
 
-            if (removals.length > 0) {
-                chrome.storage.sync.remove(removals, () => resolve(!!legacyKey));
+            const finish = () => {
+                if (legacy.ApiKey !== undefined) {
+                    chrome.storage.sync.remove(["ApiKey"], () => resolve(!!legacyKey));
+                } else {
+                    resolve(false);
+                }
+            };
+
+            if (Object.keys(updates).length > 0) {
+                chrome.storage.sync.set(updates, finish);
             } else {
-                resolve(false);
+                finish();
             }
         });
     });
