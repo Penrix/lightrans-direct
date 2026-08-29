@@ -12,7 +12,7 @@ const PROVIDER_MODELS = {
         "THUDM/GLM-4-9B-0414",
         "Qwen/Qwen3.5-4B",
     ],
-    gemini: ["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"],
+    gemini: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
 };
 
 window.onload = async () => {
