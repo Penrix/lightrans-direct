@@ -143,19 +143,25 @@ window.onload = async () => {
 
     if (serviceSelect) {
         serviceSelect.value = settings.TranslationService === "gemini" ? "gemini" : "siliconflow";
-        serviceSelect.addEventListener("change", () => {
+        serviceSelect.onchange = () => {
             const provider = currentProvider();
             const defaultModel = PROVIDER_MODELS[provider][0];
 
-            if (customModelCheckbox && customModelCheckbox.checked) {
-                customModelCheckbox.checked = false;
-                saveOption(settings, ["CustomModel"], false);
-            }
+            settings.TranslationService = provider;
+            settings.AIModel = defaultModel;
+            settings.CustomModel = false;
 
+            if (customModelCheckbox) customModelCheckbox.checked = false;
             populateModels(provider, defaultModel);
-            saveOption(settings, ["AIModel"], defaultModel);
+
+            chrome.storage.sync.set({
+                TranslationService: provider,
+                AIModel: defaultModel,
+                CustomModel: false,
+            });
+
             syncProviderUi();
-        });
+        };
     }
 
     if (customModelCheckbox) {
