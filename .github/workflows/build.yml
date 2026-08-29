@@ -1,10 +1,10 @@
 name: Build extension
 
 on:
+  pull_request:
   push:
     branches:
-      - feat/direct-providers-v1
-  pull_request:
+      - main
 
 jobs:
   build:
