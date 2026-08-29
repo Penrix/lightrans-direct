@@ -9,11 +9,10 @@ const PROVIDER_MODELS = {
         "THUDM/GLM-4-9B-0414",
         "Qwen/Qwen3.5-4B",
     ],
-    gemini: [
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.7-flash",
-    ],
+    // In real browser testing, 3.5 Flash is the Gemini model that is currently
+    // responsive enough for interactive translation. Other model IDs remain
+    // available through the custom-model setting for experimentation.
+    gemini: ["gemini-3.5-flash"],
 };
 
 const channel = new Channel();
@@ -125,12 +124,13 @@ function saveOption(key, value) {
 
 function addEventListener() {
     document.getElementById("translateSubmit").addEventListener("click", translateSubmit);
+    document.getElementById("translatePage").addEventListener("click", translateCurrentPage);
     document.addEventListener("keypress", translatePreSubmit);
 }
 
 function friendlyTranslateError(message) {
     if (/SiliconFlow.*\b402\b|status code 402/i.test(message)) {
-        return "SiliconFlow 返回 402：账户状态阻止 API 调用。请检查 SiliconFlow 实名认证、余额/欠费状态；Hunyuan-MT-7B 本身当前仍是免费模型。";
+        return "SiliconFlow 返回 402：账户状态阻止 API 调用。请检查余额/欠费状态。";
     }
     if (/\b401\b|invalid.*key|api key.*invalid/i.test(message)) {
         return "API Key 未通过认证（401）。请检查当前 Provider 对应的 Key 是否填写正确。";
@@ -145,6 +145,35 @@ function friendlyTranslateError(message) {
         return `网络请求失败：${message}`;
     }
     return `翻译失败：${message}`;
+}
+
+async function translateCurrentPage() {
+    const resultDiv = document.getElementById("translated-text");
+    const button = document.getElementById("translatePage");
+    button.disabled = true;
+    button.textContent = "正在启动…";
+
+    try {
+        await providerSettingsPending;
+        const result = await channel.request("translate_current_page", {
+            model: modelSelect.value,
+        });
+
+        if (result && result.__serviceError) {
+            throw new Error(result.__serviceError);
+        }
+        if (!result || result.started !== true) {
+            throw new Error("无法启动当前网页翻译");
+        }
+
+        resultDiv.textContent = "已开始翻译当前网页。";
+        button.textContent = "已启动";
+        setTimeout(() => window.close(), 250);
+    } catch (error) {
+        resultDiv.textContent = friendlyTranslateError(String((error && error.message) || error));
+        button.disabled = false;
+        button.textContent = "翻译当前网页";
+    }
 }
 
 async function translateSubmit() {
