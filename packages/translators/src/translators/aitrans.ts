@@ -22,8 +22,7 @@ class AITranslator {
     ];
 
     private static readonly REQUEST_TIMEOUT_MS = 20000;
-    private static readonly DEFAULT_GLOSSARY =
-        "Obsidian = Obsidian（笔记与知识管理软件）";
+    private static readonly DEFAULT_GLOSSARY = "";
 
     private apiKey = "";
     private currentModel = "THUDM/GLM-4-9B-0414";
@@ -41,9 +40,8 @@ class AITranslator {
     /**
      * Translate directly through SiliconFlow. User-defined glossary entries are
      * protected with deterministic placeholder tokens before text reaches the model,
-     * then restored after generation. This makes an entry such as
-     * "Obsidian = Obsidian（笔记与知识管理软件）" appear the same way on every occurrence
-     * instead of relying on the model to remember a prompt-level convention.
+     * then restored after generation. Automatic annotation is intentionally aimed at
+     * technical concepts/domain nouns, not software or brand proper names.
      */
     private async requestTranslate(
         from: string,
@@ -64,15 +62,15 @@ class AITranslator {
             : { text, replacements: [] as Array<{ token: string; display: string }> };
 
         const terminologyInstruction = AITranslator.isChineseTarget(to) && preferences.autoAnnotateTerms
-            ? " For English software/product/project names, technical acronyms, and specialized terms that remain in English, append a short Chinese explanation in full-width parentheses EVERY time the term appears, for example Obsidian（笔记与知识管理软件）. If you are unsure what a proper noun means, keep it unchanged and do not invent an explanation."
+            ? " When an English domain-specific noun, technical concept, jargon term, or acronym would be easier to understand if its original English form is retained, render EVERY occurrence as EnglishTerm（简短中文释义）, for example frontmatter（文档前置元数据）, backlink（反向链接）, API（应用程序编程接口）. Do NOT automatically annotate software names, product names, brands, company names, project names, people, or other proper names such as Obsidian, GitHub, Notion, Microsoft, or OpenAI; keep those names unchanged. Do NOT annotate ordinary everyday English words. Prefer only genuinely useful technical/domain terms, and never invent an explanation when unsure."
             : "";
         const glossaryInstruction = protectedText.replacements.length > 0
-            ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written; never translate, remove, split, or alter those tokens."
+            ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written. Treat each placeholder as an opaque protected term: never translate it, annotate it, put it inside a newly added explanation, remove it, split it, or alter it."
             : "";
 
         const systemPrompt = batch
             ? `Translate each numbered segment from ${from} to ${to}. Keep every <N> tag exactly and return only tagged translations.${terminologyInstruction}${glossaryInstruction}`
-            : `Translate the text from ${from} to ${to}. Preserve meaning, tone, names and formatting. Return only the translation.${terminologyInstruction}${glossaryInstruction}`;
+            : `Translate the text from ${from} to ${to}. Preserve meaning, tone, proper names and formatting. Return only the translation.${terminologyInstruction}${glossaryInstruction}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
@@ -86,7 +84,11 @@ class AITranslator {
                 maxTokens,
                 controller.signal
             );
-            return AITranslator.restoreGlossary(translated, protectedText.replacements);
+            const cleaned = AITranslator.stripPlaceholderAnnotations(
+                translated,
+                protectedText.replacements
+            );
+            return AITranslator.restoreGlossary(cleaned, protectedText.replacements);
         } catch (error) {
             const candidate = error as { name?: string; message?: string };
             if (candidate?.name === "AbortError") {
@@ -280,6 +282,28 @@ class AITranslator {
         }
 
         return { text: protectedText, replacements };
+    }
+
+    /**
+     * Models occasionally try to "help" by annotating an opaque placeholder even
+     * when instructed not to. Strip only a short parenthetical suffix immediately
+     * attached to a protected token before deterministic restoration. This avoids
+     * outputs such as Term（...（...）） without touching normal parentheses elsewhere.
+     */
+    private static stripPlaceholderAnnotations(
+        text: string,
+        replacements: Array<{ token: string; display: string }>
+    ): string {
+        let cleaned = text;
+        for (const replacement of replacements) {
+            const escaped = replacement.token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const accidentalAnnotation = new RegExp(
+                `${escaped}\\s*[（(][^）)\\n]{0,100}[）)]`,
+                "g"
+            );
+            cleaned = cleaned.replace(accidentalAnnotation, replacement.token);
+        }
+        return cleaned;
     }
 
     private static restoreGlossary(
