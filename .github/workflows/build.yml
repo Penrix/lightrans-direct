@@ -19,13 +19,13 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install translator dependencies
-        run: npm install --prefix packages/translators --no-audit --no-fund
+        run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
 
       - name: Build translators
         run: npm run build --prefix packages/translators
 
       - name: Install extension dependencies
-        run: npm install --prefix packages/lightrans --no-audit --no-fund
+        run: npm install --prefix packages/lightrans --legacy-peer-deps --no-audit --no-fund
 
       - name: Build Chrome extension
         run: npm run build:chrome --prefix packages/lightrans
