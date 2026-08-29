@@ -1,4 +1,3 @@
-import axios from "../axios";
 import { TranslationResult } from "../types";
 
 type Provider = "siliconflow" | "gemini";
@@ -17,6 +16,8 @@ class AITranslator {
         ],
         gemini: ["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"],
     };
+
+    private static readonly REQUEST_TIMEOUT_MS = 25000;
 
     private provider: Provider = "siliconflow";
     private apiKey = "";
@@ -44,8 +45,8 @@ class AITranslator {
         batch = false
     ): Promise<string> {
         const apiKey = await this.resolveApiKey();
+        const providerName = this.provider === "gemini" ? "Gemini" : "SiliconFlow";
         if (!apiKey) {
-            const providerName = this.provider === "gemini" ? "Gemini" : "SiliconFlow";
             throw new Error(`请先填写 ${providerName} API Key`);
         }
 
@@ -74,15 +75,68 @@ class AITranslator {
                 ...commonBody,
                 ...(model.startsWith("Qwen/") ? { enable_thinking: false } : {}),
             }
-            : commonBody;
+            : {
+                ...commonBody,
+                ...(model === "gemini-3.7-flash" ? { reasoning_effort: "low" } : {}),
+            };
 
-        const response = await axios.post(AITranslator.ENDPOINTS[this.provider], body, { headers });
-        const translated = (response.data?.choices?.[0]?.message?.content || "").toString().trim();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
 
-        if (!translated) {
-            throw new Error(`${this.provider} returned an empty translation`);
+        try {
+            const response = await fetch(AITranslator.ENDPOINTS[this.provider], {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+
+            const raw = await response.text();
+            let data: any = {};
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = { raw };
+                }
+            }
+
+            if (!response.ok) {
+                const detail = AITranslator.extractProviderError(data, raw, response.statusText);
+                throw new Error(`${providerName} API ${response.status}: ${detail}`);
+            }
+
+            const translated = (data?.choices?.[0]?.message?.content || "").toString().trim();
+            if (!translated) {
+                throw new Error(`${providerName} 返回了空译文`);
+            }
+            return translated;
+        } catch (error) {
+            const candidate = error as { name?: string; message?: string };
+            if (candidate?.name === "AbortError") {
+                throw new Error(
+                    `${providerName} 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
+                    "请检查当前网络/代理是否能直连该 Provider，或切换其它模型后重试。"
+                );
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
         }
-        return translated;
+    }
+
+    private static extractProviderError(data: any, raw: string, fallback: string): string {
+        const directMessage = data?.error?.message || data?.message;
+        if (typeof directMessage === "string" && directMessage.trim()) {
+            return directMessage.trim();
+        }
+        if (typeof data?.error === "string" && data.error.trim()) {
+            return data.error.trim();
+        }
+        if (raw && raw.trim()) {
+            return raw.trim().slice(0, 600);
+        }
+        return fallback || "Unknown provider error";
     }
 
     /**
@@ -234,7 +288,7 @@ class AITranslator {
 
     private static isTransientError(error: unknown): boolean {
         const message = AITranslator.errorMessage(error);
-        return /\b429\b|rate\s*limit|\b5\d\d\b|network|fetch|timeout|temporar/i.test(message);
+        return /\b429\b|rate\s*limit|\b5\d\d\b|network|fetch|timeout|超时|temporar/i.test(message);
     }
 
     private static transientError(error: unknown): Error {
