@@ -6,17 +6,11 @@ import {
     setProviderSecret,
 } from "common/scripts/settings.js";
 
-const PROVIDER_MODELS = {
-    siliconflow: [
-        "tencent/Hunyuan-MT-7B",
-        "THUDM/GLM-4-9B-0414",
-        "Qwen/Qwen3.5-4B",
-    ],
-    // Browser smoke testing currently shows 3.5 Flash as the useful Gemini
-    // option for interactive translation. Experimental model IDs can still be
-    // entered through the custom-model field below.
-    gemini: ["gemini-3.5-flash"],
-};
+const MODELS = [
+    "THUDM/GLM-4-9B-0414",
+    "tencent/Hunyuan-MT-7B",
+    "Qwen/Qwen3.5-4B",
+];
 
 window.onload = async () => {
     i18nHTML();
@@ -24,29 +18,23 @@ window.onload = async () => {
     const settings = await getOrSetDefaultSettings(undefined, DEFAULT_SETTINGS);
     const localSecrets = await getOrSetLocalSecrets();
 
-    const serviceSelect = document.getElementById("translation-service");
     const apiKeyInput = document.getElementById("api-key");
-    const apiKeyProviderLabel = document.getElementById("apikey-provider-label");
-    const privacyNote = document.getElementById("provider-privacy-note");
     const customModelCheckbox = document.getElementById("custom-model");
     const aiModelSelect = document.getElementById("ai-model");
     const aiModelInput = document.getElementById("ai-model-input");
+    const glossaryText = document.getElementById("glossary-text");
+    const glossaryStatus = document.getElementById("glossary-status");
 
-    function currentProvider() {
-        return serviceSelect && serviceSelect.value === "gemini" ? "gemini" : "siliconflow";
-    }
-
-    function populateModels(provider, selectedModel) {
+    function populateModels(selectedModel) {
         if (!aiModelSelect) return;
-        const models = PROVIDER_MODELS[provider] || PROVIDER_MODELS.siliconflow;
         aiModelSelect.innerHTML = "";
-        for (const model of models) {
+        for (const model of MODELS) {
             const option = document.createElement("option");
             option.value = model;
             option.textContent = model;
             aiModelSelect.appendChild(option);
         }
-        aiModelSelect.value = models.includes(selectedModel) ? selectedModel : models[0];
+        aiModelSelect.value = MODELS.includes(selectedModel) ? selectedModel : MODELS[0];
     }
 
     function syncCustomModelVisibility() {
@@ -62,26 +50,17 @@ window.onload = async () => {
         }
     }
 
-    function syncProviderUi() {
-        const provider = currentProvider();
-        const providerName = provider === "gemini" ? "Gemini" : "SiliconFlow";
-        if (apiKeyProviderLabel) apiKeyProviderLabel.textContent = `${providerName} API Key：`;
-        if (apiKeyInput) {
-            apiKeyInput.value = localSecrets.ProviderSecrets[provider] || "";
-            apiKeyInput.placeholder = `仅保存在本机浏览器中的 ${providerName} API Key`;
-        }
-        if (privacyNote) {
-            privacyNote.textContent = provider === "gemini"
-                ? "Gemini 免费层：网页文本会直传 Google；Google 当前说明免费层内容可能用于改进产品。普通下拉仅保留当前实测可用的 3.5 Flash，其它模型可用自定义模型实验。"
-                : "SiliconFlow：网页文本会直传 SiliconFlow；本扩展不经过开发者中继服务器。";
-        }
-        syncCustomModelVisibility();
+    function updateGlossaryStatus() {
+        if (!glossaryStatus || !glossaryText) return;
+        const count = glossaryText.value
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line && !line.startsWith("#") && (line.includes("=") || line.includes("=>")))
+            .length;
+        glossaryStatus.textContent = `已配置 ${count} 条固定术语。每次出现都会按右侧文本显示。`;
     }
 
-    populateModels(
-        settings.TranslationService === "gemini" ? "gemini" : "siliconflow",
-        settings.AIModel
-    );
+    populateModels(settings.AIModel);
 
     const inputElements = document.getElementsByTagName("input");
     const selectElements = document.querySelectorAll("select[setting-type='select']");
@@ -115,7 +94,7 @@ window.onload = async () => {
                 };
                 break;
             case "switch":
-                element.checked = settingItemValue;
+                element.checked = !!settingItemValue;
                 element.onchange = (event) => {
                     const target = event.target;
                     saveOption(settings, target.getAttribute("setting-path").split(/\s/g), target.checked);
@@ -144,29 +123,6 @@ window.onload = async () => {
         }
     }
 
-    if (serviceSelect) {
-        serviceSelect.value = settings.TranslationService === "gemini" ? "gemini" : "siliconflow";
-        serviceSelect.onchange = () => {
-            const provider = currentProvider();
-            const defaultModel = PROVIDER_MODELS[provider][0];
-
-            settings.TranslationService = provider;
-            settings.AIModel = defaultModel;
-            settings.CustomModel = false;
-
-            if (customModelCheckbox) customModelCheckbox.checked = false;
-            populateModels(provider, defaultModel);
-
-            chrome.storage.sync.set({
-                TranslationService: provider,
-                AIModel: defaultModel,
-                CustomModel: false,
-            });
-
-            syncProviderUi();
-        };
-    }
-
     if (customModelCheckbox) {
         customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
     }
@@ -180,19 +136,37 @@ window.onload = async () => {
     }
 
     if (apiKeyInput) {
+        apiKeyInput.value = localSecrets.ProviderSecrets.siliconflow || "";
         let saveTimer = null;
         apiKeyInput.addEventListener("input", () => {
+            const key = apiKeyInput.value || "";
             if (saveTimer) clearTimeout(saveTimer);
             saveTimer = setTimeout(async () => {
-                const provider = currentProvider();
-                const key = apiKeyInput.value || "";
-                localSecrets.ProviderSecrets[provider] = key.trim();
-                await setProviderSecret(provider, key);
+                localSecrets.ProviderSecrets.siliconflow = key.trim();
+                await setProviderSecret("siliconflow", key);
             }, 250);
         });
     }
 
-    syncProviderUi();
+    if (glossaryText) {
+        glossaryText.value = settings.GlossaryText || "";
+        updateGlossaryStatus();
+        let glossaryTimer = null;
+        glossaryText.addEventListener("input", () => {
+            const value = glossaryText.value;
+            updateGlossaryStatus();
+            if (glossaryTimer) clearTimeout(glossaryTimer);
+            glossaryTimer = setTimeout(() => {
+                settings.GlossaryText = value;
+                chrome.storage.sync.set({ GlossaryText: value });
+            }, 250);
+        });
+    }
+
+    // Provider selection was intentionally removed. Normalize old installs immediately.
+    settings.TranslationService = "siliconflow";
+    chrome.storage.sync.set({ TranslationService: "siliconflow" });
+    syncCustomModelVisibility();
 };
 
 function getSetting(localSettings, settingItemPath) {
