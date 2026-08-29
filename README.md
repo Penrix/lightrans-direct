@@ -2,17 +2,21 @@
 
 一个以“**直连 SiliconFlow、无开发者中继、API Key 不同步**”为核心原则的 Lightrans 分支。
 
-本项目保留 Lightrans / EdgeTranslate 已经成熟的划词翻译、弹窗翻译、整页翻译、PDF 等交互与页面处理能力，主要重做联网与密钥边界，并增加可控的术语注释层。
+本项目保留 Lightrans / EdgeTranslate 已经成熟的划词翻译、弹窗翻译、整页翻译、PDF 等交互与页面处理能力，主要重做联网、密钥边界与 AI 术语辅助。
 
 ## 数据流与隐私
 
-翻译请求只发送到 SiliconFlow：
+翻译请求直接发送到 SiliconFlow：
 
 - `https://api.siliconflow.cn/v1/chat/completions`
 
-本分支不使用 Lightrans 原有的 `trans.hin.cool` 开发者中继，也不内置共享 Relay Token。Gemini 已从正常产品路径移除。
+本分支不使用 Lightrans 原有的 `trans.hin.cool` 开发者中继，也不内置共享 Relay Token；Gemini 已从产品路径移除。
 
 API Key 保存在 `chrome.storage.local` 的扩展本地存储中，不写入 `chrome.storage.sync`，因此不会通过 Chrome/Firefox 的扩展设置同步机制同步到其他设备。请注意：浏览器本地扩展存储不是操作系统密钥链，仍应使用专门的、权限与额度尽量受限的 API Key。
+
+官方参考：
+
+- SiliconFlow Chat Completions: https://docs.siliconflow.cn/en/api-reference/chat-completions/chat-completions
 
 ## 默认配置
 
@@ -20,44 +24,32 @@ API Key 保存在 `chrome.storage.local` 的扩展本地存储中，不写入 `c
 - 模型：`THUDM/GLM-4-9B-0414`
 - 目标语言：沿用浏览器 / 扩展原有语言设置
 - 页面翻译：仅译文
-- 固定术语表：启用
-- 自动术语注释：启用
+- 自动术语注释：开启
+- 固定术语表：开启，但默认内容为空
 
-内置模型：
+SiliconFlow 内置 `THUDM/GLM-4-9B-0414`、`tencent/Hunyuan-MT-7B`、`Qwen/Qwen3.5-4B` 三个当前可选模型。模型免费状态由 Provider 决定，未来可能变化。
 
-- `THUDM/GLM-4-9B-0414`
-- `tencent/Hunyuan-MT-7B`
-- `Qwen/Qwen3.5-4B`
-
-免费状态由 SiliconFlow 决定，未来可能变化。也可以启用“自定义模型”，手动填写 SiliconFlow 支持的模型 ID。
+也可以启用“自定义模型”，手动填写 SiliconFlow 支持的模型 ID。
 
 ## 术语注释
 
-Lightrans Direct 提供两层术语处理。
+自动注释的目标不是品牌名或软件名，而是阅读技术内容时真正可能形成理解门槛的英文专业名词、概念词、术语和缩写。
 
-### 固定术语表
+例如：
 
-设置页可按每行一条的格式写规则：
+- `frontmatter` → `frontmatter（文档前置元数据）`
+- `backlink` → `backlink（反向链接）`
+- `API` → `API（应用程序编程接口）`
 
-```text
-Obsidian = Obsidian（笔记与知识管理软件）
-Docker = Docker（容器化平台）
-MCP = MCP（模型上下文协议）
-```
+软件、产品、品牌、公司、项目、人名等专名默认保持原样，例如 `Obsidian`、`GitHub`、`Notion` 不自动添加解释。
 
-固定术语不依赖模型“记住提示词”。扩展会先把原词替换成受保护的占位符，模型翻译完成后再机械还原。因此同一术语在一页中出现多少次，就会按配置格式显示多少次。
-
-匹配目前采用原词精确匹配。固定术语优先级高于自动注释。
-
-### 自动术语注释
-
-启用后，当目标语言为中文时，模型会尝试对术语表之外的英文软件名、产品名、项目名、技术缩写和专业词添加简短中文说明，例如：
+用户仍可通过固定术语表强制指定任意文本的最终显示形式，每行格式：
 
 ```text
-Obsidian（笔记与知识管理软件）
+原词 = 最终显示文本
 ```
 
-如果模型不确定一个专有名词的含义，提示词要求保留原词而不是编造解释。对于必须保持完全一致的术语，仍建议加入固定术语表。
+固定术语使用占位符保护，在模型翻译之后确定性恢复，不依赖模型是否记住提示词。对受保护占位符还会清理模型误加的紧邻括号注释，降低重复嵌套或括号污染。
 
 ## 功能
 
@@ -69,10 +61,10 @@ Obsidian（笔记与知识管理软件）
 - PDF 翻译
 - 页面与域名黑名单
 - SiliconFlow 直连
-- 弹窗直接切换模型
+- 模型可在弹窗直接切换
 - API Key 本机保存
-- 固定术语表
-- 自动英文术语中文注释
+- 专业英文名词 / 技术术语自动中文注释
+- 用户固定术语表
 
 ## 安装开发版
 
@@ -97,7 +89,7 @@ Obsidian（笔记与知识管理软件）
 
 仓库由两个主要 package 组成：
 
-- `packages/translators`：SiliconFlow / 翻译请求 / 术语保护层
+- `packages/translators`：翻译请求与术语处理层
 - `packages/lightrans`：浏览器扩展 UI、后台逻辑、页面注入与整页翻译
 
 ```bash
@@ -111,7 +103,7 @@ npm run build:chrome
 npm run build:firefox
 ```
 
-仓库内的 GitHub Actions 会验证隐私边界、translator 构建、Chrome 构建与 Firefox 构建，并生成可下载的构建产物。
+仓库内的 GitHub Actions 会对 Chrome 与 Firefox 构建进行验证。
 
 ## 与上游的关系
 
