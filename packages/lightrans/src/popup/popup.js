@@ -3,227 +3,216 @@ import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
 
-/**
- * Communication channel.
- */
+const MODELS = [
+    "THUDM/GLM-4-9B-0414",
+    "tencent/Hunyuan-MT-7B",
+    "Qwen/Qwen3.5-4B",
+];
+
 const channel = new Channel();
 
-// 获取下拉列表元素
 let sourceLanguage = document.getElementById("sl");
 let targetLanguage = document.getElementById("tl");
-// 获取交换按钮
 let exchangeButton = document.getElementById("exchange");
-/**
- * 初始化设置列表
- */
-window.onload = function () {
+let modelSelect = document.getElementById("model");
+let modelSettingsPending = Promise.resolve();
+
+window.onload = async function () {
     i18nHTML();
 
     sourceLanguage.onchange = function () {
-        // 如果源语言是自动判断语言类型(值是auto),则按钮显示灰色，避免用户点击,如果不是，则显示蓝色，可以点击
         judgeValue(exchangeButton, sourceLanguage);
-        updateLanguageSetting(
-            sourceLanguage.options[sourceLanguage.selectedIndex].value,
-            targetLanguage.options[targetLanguage.selectedIndex].value
-        );
-        showSourceTarget(); // update source language and target language in input placeholder
+        updateLanguageSetting(sourceLanguage.value, targetLanguage.value);
+        showSourceTarget();
     };
 
     targetLanguage.onchange = function () {
-        updateLanguageSetting(
-            sourceLanguage.options[sourceLanguage.selectedIndex].value,
-            targetLanguage.options[targetLanguage.selectedIndex].value
-        );
-        showSourceTarget(); // update source language and target language in input placeholder
+        updateLanguageSetting(sourceLanguage.value, targetLanguage.value);
+        showSourceTarget();
     };
 
-    // 添加交换按钮对点击事件的监听
     exchangeButton.onclick = exchangeLanguage;
 
-    // 获得用户之前选择的弹窗语言翻译选项
-    getOrSetDefaultSettings(["popupLanguageSetting", "languageSetting"], DEFAULT_SETTINGS).then(
-        (result) => {
-            // 使用弹窗独立的语言设置，如果没有则使用全局设置作为默认值
-            let languageSetting = result.popupLanguageSetting || result.languageSetting;
-
-            // languages是可选的源语言和目标语言的列表
-            for (let language in LANGUAGES) {
-                let value = language;
-                let name = chrome.i18n.getMessage(LANGUAGES[language]);
-
-                if (languageSetting && value == languageSetting.sl) {
-                    sourceLanguage.options.add(new Option(name, value, true, true));
-                } else {
-                    sourceLanguage.options.add(new Option(name, value));
-                }
-
-                if (languageSetting && value == languageSetting.tl) {
-                    targetLanguage.options.add(new Option(name, value, true, true));
-                } else {
-                    targetLanguage.options.add(new Option(name, value));
-                }
-            }
-
-            showSourceTarget(); // show source language and target language in input placeholder
-        }
+    const settings = await getOrSetDefaultSettings(
+        ["languageSetting", "AIModel", "TranslationService"],
+        DEFAULT_SETTINGS
     );
-    // 统一添加事件监听
+    const popupStored = await getSyncStorage(["popupLanguageSetting"]);
+    const languageSetting = popupStored.popupLanguageSetting || settings.languageSetting;
+
+    for (let language in LANGUAGES) {
+        const value = language;
+        const name = chrome.i18n.getMessage(LANGUAGES[language]);
+
+        sourceLanguage.options.add(
+            new Option(name, value, languageSetting && value === languageSetting.sl, languageSetting && value === languageSetting.sl)
+        );
+        targetLanguage.options.add(
+            new Option(name, value, languageSetting && value === languageSetting.tl, languageSetting && value === languageSetting.tl)
+        );
+    }
+
+    populateModels(settings.AIModel);
+    modelSelect.onchange = () => saveModel(modelSelect.value);
+
+    // Normalize old installs that had Gemini selected.
+    chrome.storage.sync.set({ TranslationService: "siliconflow" });
+
+    showSourceTarget();
+    judgeValue(exchangeButton, sourceLanguage);
     addEventListener();
 };
 
-/**
- * 监听快捷键
- */
+function getSyncStorage(keys) {
+    return new Promise((resolve) => chrome.storage.sync.get(keys, resolve));
+}
+
+function populateModels(selectedModel) {
+    modelSelect.innerHTML = "";
+    for (const model of MODELS) {
+        modelSelect.options.add(new Option(model, model));
+    }
+    modelSelect.value = MODELS.includes(selectedModel) ? selectedModel : MODELS[0];
+}
+
+function saveModel(model) {
+    modelSettingsPending = new Promise((resolve) => {
+        chrome.storage.sync.set(
+            {
+                TranslationService: "siliconflow",
+                AIModel: model,
+                CustomModel: false,
+            },
+            () => setTimeout(resolve, 80)
+        );
+    });
+    return modelSettingsPending;
+}
+
 chrome.commands.onCommand.addListener((command) => {
-    switch (command) {
-        case "exchange_source_target_lang":
-            exchangeLanguage();
-            break;
-        default:
-            break;
+    if (command === "exchange_source_target_lang") {
+        exchangeLanguage();
     }
 });
 
-/**
- * 保存弹窗翻译语言设定（仅用于弹窗，不影响划词翻译）
- *
- * @param {*} sourceLanguage 源语言
- * @param {*} targetLanguage 目标语言
- */
-function updateLanguageSetting(sourceLanguage, targetLanguage) {
-    // 只保存弹窗的语言设置，不发送消息给background影响全局设置
-    saveOption("popupLanguageSetting", { sl: sourceLanguage, tl: targetLanguage });
+function updateLanguageSetting(source, target) {
+    saveOption("popupLanguageSetting", { sl: source, tl: target });
 }
 
-/**
- * 保存一条设置项
- *
- * @param {*} key 设置项名
- * @param {*} value 设置项
- */
 function saveOption(key, value) {
-    let item = {};
+    const item = {};
     item[key] = value;
     chrome.storage.sync.set(item);
 }
 
-/**
- * 需要对页面中的元素添加事件监听时，请在此函数中添加
- */
 function addEventListener() {
     document.getElementById("translateSubmit").addEventListener("click", translateSubmit);
-    document.addEventListener("keypress", translatePreSubmit); // 对用户按下回车按键后的事件进行监听
+    document.getElementById("translatePage").addEventListener("click", translateCurrentPage);
+    document.addEventListener("keypress", translatePreSubmit);
 }
 
-/**
- * block start
- * 事件监听的回调函数定义请在此区域中进
- */
-
-/**
- * 将翻译错误消息转换为用户友好的提示文案
- *
- * @param {String} message 错误消息
- * @returns {String} 友好的提示文案
- */
 function friendlyTranslateError(message) {
-    // 限流 / 网关错误（免费中继会把上游限流透传成 502）：提示模型负载高
+    if (/SiliconFlow.*\b402\b|status code 402/i.test(message)) {
+        return "SiliconFlow 返回 402：账户状态阻止 API 调用。请检查余额/欠费状态。";
+    }
+    if (/\b401\b|invalid.*key|api key.*invalid/i.test(message)) {
+        return "SiliconFlow API Key 未通过认证（401）。请检查 Key 是否填写正确。";
+    }
+    if (/\b403\b|permission|forbidden/i.test(message)) {
+        return `SiliconFlow 拒绝访问（403）：${message}`;
+    }
     if (/transient|429|rate\s*limit|status code 5\d{2}/i.test(message)) {
         return chrome.i18n.getMessage("MODEL_BUSY") || "该模型负载高，请使用其它模型或稍后重试。";
     }
-    // 网络层错误（断网、超时等）
-    if (/network|timeout|NET_ERR|ECONN|failed to fetch/i.test(message)) {
-        return chrome.i18n.getMessage("NETERR") || "网络错误！请检查您的网络连接。";
+    if (/timeout|超时|network|NET_ERR|ECONN|failed to fetch|abort/i.test(message)) {
+        return `网络请求失败：${message}`;
     }
-    // 其他错误（如自定义模式缺少 API Key）保留原始消息，便于用户定位配置问题
     return `翻译失败：${message}`;
 }
 
-/**
- * 负责在弹窗中输入内容后进行翻译
- */
-function translateSubmit() {
-    let content = document.getElementById("translate_input").value;
-    if (content.replace(/\s*/, "") !== "") {
-        // 判断值是否为空
-        document.getElementById("hint_message").style.display = "none";
+async function translateCurrentPage() {
+    const resultDiv = document.getElementById("translated-text");
+    const button = document.getElementById("translatePage");
+    button.disabled = true;
+    button.textContent = "正在启动…";
 
-        // 显示加载状态
-        const resultDiv = document.getElementById("translated-text");
-        resultDiv.innerHTML = "翻译中...";
-
-        // 获取当前弹窗的语言设置
-        const sl = sourceLanguage.value;
-        const tl = targetLanguage.value;
-
-        // 直接发送翻译请求，获取结果后显示在当前弹窗
-        channel.request("translate_in_popup", {
-            text: content,
-            sl: sl,
-            tl: tl
-        }).then((result) => {
-            if (result && result.__serviceError) {
-                // background 服务处理失败（如模型负载高、网络错误）
-                resultDiv.innerHTML = friendlyTranslateError(result.__serviceError);
-            } else if (result && result.mainMeaning) {
-                resultDiv.innerHTML = result.mainMeaning;
-            } else {
-                resultDiv.innerHTML = "翻译失败，请重试";
-            }
-        }).catch((error) => {
-            resultDiv.innerHTML = friendlyTranslateError(String((error && error.message) || error));
+    try {
+        await modelSettingsPending;
+        const result = await channel.request("translate_current_page", {
+            model: modelSelect.value,
         });
-    } // 提示输入的内容为空
-    else document.getElementById("hint_message").style.display = "inline";
-}
 
-/**
- *
- * 如果源语言是自动判断语言类型(值是auto),则按钮显示灰色，避免用户点击
- *
- * @param {*HTMLElement} exchangeButton 特定的一个element,是一个交换按钮图
- * @param {*HTMLElement} sourceLanguage 特定的一个element,源语言的选项
- */
-function judgeValue(exchangeButton, sourceLanguage) {
-    if (sourceLanguage.value === "auto") exchangeButton.style.color = "gray";
-    else exchangeButton.style.color = "#4a8cf7";
-}
+        if (result && result.__serviceError) {
+            throw new Error(result.__serviceError);
+        }
+        if (!result || result.started !== true) {
+            throw new Error("无法启动当前网页翻译");
+        }
 
-/**
- * 交换源语言和目标语言
- */
-function exchangeLanguage() {
-    if (sourceLanguage.value !== "auto") {
-        let tempValue = targetLanguage.value;
-        targetLanguage.value = sourceLanguage.value;
-        sourceLanguage.value = tempValue;
-        updateLanguageSetting(sourceLanguage.value, targetLanguage.value);
-        showSourceTarget(); // update source language and target language in input placeholder
+        resultDiv.textContent = "已开始翻译当前网页。";
+        button.textContent = "已启动";
+        setTimeout(() => window.close(), 250);
+    } catch (error) {
+        resultDiv.textContent = friendlyTranslateError(String((error && error.message) || error));
+        button.disabled = false;
+        button.textContent = "翻译当前网页";
     }
 }
 
+async function translateSubmit() {
+    const content = document.getElementById("translate_input").value;
+    if (content.replace(/\s*/, "") === "") {
+        document.getElementById("hint_message").style.display = "inline";
+        return;
+    }
 
+    document.getElementById("hint_message").style.display = "none";
+    const resultDiv = document.getElementById("translated-text");
+    resultDiv.textContent = "翻译中...";
 
-/**
- * 判断如果按下的是按钮是enter键，就调用翻译的函数
- */
+    try {
+        await modelSettingsPending;
+        const result = await channel.request("translate_in_popup", {
+            text: content,
+            sl: sourceLanguage.value,
+            tl: targetLanguage.value,
+        });
+
+        if (result && result.__serviceError) {
+            resultDiv.textContent = friendlyTranslateError(result.__serviceError);
+        } else if (result && result.mainMeaning) {
+            resultDiv.textContent = result.mainMeaning;
+        } else {
+            resultDiv.textContent = "翻译失败：SiliconFlow 未返回译文。";
+        }
+    } catch (error) {
+        resultDiv.textContent = friendlyTranslateError(String((error && error.message) || error));
+    }
+}
+
+function judgeValue(button, source) {
+    button.style.color = source.value === "auto" ? "gray" : "#4a8cf7";
+}
+
+function exchangeLanguage() {
+    if (sourceLanguage.value === "auto") return;
+    const tempValue = targetLanguage.value;
+    targetLanguage.value = sourceLanguage.value;
+    sourceLanguage.value = tempValue;
+    updateLanguageSetting(sourceLanguage.value, targetLanguage.value);
+    showSourceTarget();
+}
+
 function translatePreSubmit(event) {
-    let int_keycode = event.charCode || event.keyCode;
-    if (int_keycode == "13") {
+    const keycode = event.charCode || event.keyCode;
+    if (keycode === 13) {
         translateSubmit();
     }
 }
 
-/**
- * show source language and target language hint in placeholder of input element
- */
 function showSourceTarget() {
-    let inputElement = document.getElementById("translate_input");
-    let sourceLanguageString = sourceLanguage.options[sourceLanguage.selectedIndex].text;
-    let targetLanguageString = targetLanguage.options[targetLanguage.selectedIndex].text;
+    const inputElement = document.getElementById("translate_input");
+    const sourceLanguageString = sourceLanguage.options[sourceLanguage.selectedIndex].text;
+    const targetLanguageString = targetLanguage.options[targetLanguage.selectedIndex].text;
     inputElement.placeholder = `${sourceLanguageString} ==> ${targetLanguageString}`;
 }
-
-/**
- * end block
- */

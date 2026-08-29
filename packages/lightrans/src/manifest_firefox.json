@@ -7,7 +7,7 @@
     },
     "applications": {
         "gecko": {
-            "id": "kuangkunh@163.com",
+            "id": "lightrans-direct@penrix.github",
             "strict_min_version": "109.0"
         }
     },
@@ -26,11 +26,6 @@
         {
             "matches": ["<all_urls>"],
             "js": ["./content/banner_controller.js"]
-        },
-        {
-            "matches": ["*://*.deepl.com/*"],
-            "js": ["./content/deepl_injector.js"],
-            "all_frames": true
         }
     ]
 }

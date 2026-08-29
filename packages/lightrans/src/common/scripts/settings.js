@@ -1,24 +1,20 @@
 import { BROWSER_LANGUAGES_MAP } from "common/scripts/languages.js";
 
 /**
- * default settings for this extension
+ * Settings that are safe to sync between browsers.
+ * Provider API keys are intentionally excluded and live in chrome.storage.local.
  */
 const DEFAULT_SETTINGS = {
     blacklist: {
         urls: {},
         domains: { "chrome.google.com": true, extensions: true },
     },
-    // Resize: determine whether the web page will resize when showing translation result
-    // RTL: determine whether the text in translation block should display from right to left
-    // FoldLongContent: determine whether to fold long translation content
-    // SelectTranslatePosition: the position of select translate button.
     LayoutSettings: {
         Resize: false,
         RTL: false,
         FoldLongContent: true,
         SelectTranslatePosition: "TopRight",
     },
-    // Default settings of source language and target language
     languageSetting: { sl: "auto", tl: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()] },
     OtherSettings: {
         MutualTranslate: true,
@@ -26,35 +22,28 @@ const DEFAULT_SETTINGS = {
         TranslateAfterDblClick: false,
         TranslateAfterSelect: false,
         CancelTextSelection: false,
-        UseGoogleAnalytics: true,
         UsePDFjs: true,
     },
     DefaultTranslator: "AITrans",
-    AIModel: "THUDM/GLM-4-9B-0414",
     DefaultPageTranslator: "AITrans",
-    // Page translation display mode: "original" / "translated" / "bilingual"
+    // Kept for compatibility with the upstream settings shape. Lightrans Direct
+    // intentionally supports only direct SiliconFlow requests now.
+    TranslationService: "siliconflow",
+    AIModel: "THUDM/GLM-4-9B-0414",
     PageTranslationDisplayMode: "translated",
-    // 翻译服务模式：free（硅基流动免费，走我们的反代服务，零配置免 Key）/ custom（硅基流动自定义，直连官方 + 自有 Key）
-    TranslationService: "free",
-    // 自定义模式下使用的 SiliconFlow API Key（仅 custom 模式读取）
-    ApiKey: "",
-    // 自定义模式下是否使用用户自己输入的模型名称（勾选后模型选择框变为可输入）
     CustomModel: false,
-    // 自定义模型名称（CustomModel 为 true 时生效，翻译时作为 model 字段直连硅基流动）
     CustomModelName: "",
+    // Optional deterministic override layer. Normal translation does not auto-annotate
+    // or preserve English terms; only user-written glossary rules override model output.
+    GlossaryEnabled: true,
+    GlossaryText: "",
     HybridTranslatorConfig: {
-        // The translators used in current hybrid translate.
         translators: ["AITrans"],
-
-        // The translators for each item.
         selections: {
-            // ATTENTION: The following four items MUST HAVE THE SAME TRANSLATOR!
             originalText: "AITrans",
             mainMeaning: "AITrans",
             tPronunciation: "AITrans",
             sPronunciation: "AITrans",
-
-            // For the following three items, any translator combination is OK.
             detailedMeanings: "AITrans",
             definitions: "AITrans",
             examples: "AITrans",
@@ -63,14 +52,16 @@ const DEFAULT_SETTINGS = {
     HidePageTranslatorBanner: false,
 };
 
-/**
- * assign default value to settings which are undefined in recursive way
- * @param {*} result setting result stored in chrome.storage
- * @param {*} settings default settings
- */
+const DEFAULT_SECRETS = {
+    ProviderSecrets: {
+        siliconflow: "",
+    },
+};
+
+const LEGACY_OBSIDIAN_GLOSSARY = "Obsidian = Obsidian（笔记与知识管理软件）";
+
 function setDefaultSettings(result, settings) {
     for (let i in settings) {
-        // settings[i] contains key-value settings
         if (
             typeof settings[i] === "object" &&
             !(settings[i] instanceof Array) &&
@@ -79,52 +70,87 @@ function setDefaultSettings(result, settings) {
             if (result[i]) {
                 setDefaultSettings(result[i], settings[i]);
             } else {
-                // settings[i] contains several setting items but these have not been set before
                 result[i] = settings[i];
             }
         } else if (result[i] === undefined) {
-            // settings[i] is a single setting item and it has not been set before
             result[i] = settings[i];
         }
     }
 }
 
 /**
- * Get settings from storage. If some of the settings have not been initialized,
- * initialize them with the given default values.
- *
- * @param {String | Array<String>} settings setting name to get
- * @param {Object | Function} defaults default values or function to generate default values
- * @returns {Promise<Any>} settings
+ * Get synced settings and initialize missing defaults.
+ * If an upstream installation left ApiKey in sync storage, migrate it to the
+ * device-local SiliconFlow secret slot and delete the synced copy immediately.
  */
-function getOrSetDefaultSettings(settings, defaults) {
+function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
     return new Promise((resolve) => {
-        // If there is only one setting to get, warp it up.
         if (typeof settings === "string") {
             settings = [settings];
         } else if (settings === undefined) {
-            // If settings is undefined, collect all setting keys in defaults.
-            settings = [];
-            for (let key in defaults) {
-                settings.push(key);
-            }
+            settings = Object.keys(defaults);
         }
 
-        chrome.storage.sync.get(settings, (result) => {
-            let updated = false;
+        const requested = settings;
+        const wantsLegacyApiKey = requested.includes("ApiKey");
+        const storageKeys = requested.filter((key) => key !== "ApiKey");
+        if (wantsLegacyApiKey) storageKeys.push("ApiKey");
 
-            for (let setting of settings) {
-                if (!result[setting]) {
+        chrome.storage.sync.get(storageKeys, async (stored) => {
+            const legacyApiKey = (stored.ApiKey || "").trim();
+            delete stored.ApiKey;
+
+            if (legacyApiKey) {
+                const local = await getOrSetLocalSecrets();
+                if (!local.ProviderSecrets.siliconflow) {
+                    await setProviderSecret("siliconflow", legacyApiKey);
+                }
+                await new Promise((done) => chrome.storage.sync.remove(["ApiKey"], done));
+            }
+
+            let updated = false;
+            for (const setting of requested) {
+                if (setting === "ApiKey") continue;
+                if (stored[setting] === undefined) {
                     if (typeof defaults === "function") {
                         defaults = defaults(settings);
                     }
-                    result[setting] = defaults[setting];
+                    stored[setting] = defaults[setting];
                     updated = true;
                 }
             }
 
+            // Normalize relay-era and removed-provider values.
+            if (
+                stored.TranslationService === "free" ||
+                stored.TranslationService === "custom" ||
+                stored.TranslationService === "gemini"
+            ) {
+                stored.TranslationService = "siliconflow";
+                updated = true;
+            }
+            if (typeof stored.AIModel === "string" && /^gemini-/i.test(stored.AIModel)) {
+                stored.AIModel = "THUDM/GLM-4-9B-0414";
+                updated = true;
+            }
+
+            // v1 briefly shipped an Obsidian software-name annotation as the default
+            // glossary. Remove only that exact untouched default; user-edited glossary
+            // content is preserved.
+            if (
+                requested.includes("GlossaryText") &&
+                typeof stored.GlossaryText === "string" &&
+                stored.GlossaryText.trim() === LEGACY_OBSIDIAN_GLOSSARY
+            ) {
+                stored.GlossaryText = "";
+                updated = true;
+            }
+
+            const result = { ...stored };
+            if (wantsLegacyApiKey) result.ApiKey = legacyApiKey;
+
             if (updated) {
-                chrome.storage.sync.set(result, () => resolve(result));
+                chrome.storage.sync.set(stored, () => resolve(result));
             } else {
                 resolve(result);
             }
@@ -132,4 +158,40 @@ function getOrSetDefaultSettings(settings, defaults) {
     });
 }
 
-export { DEFAULT_SETTINGS, setDefaultSettings, getOrSetDefaultSettings };
+function getOrSetLocalSecrets() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(["ProviderSecrets"], (result) => {
+            const secrets = result || {};
+            setDefaultSettings(secrets, DEFAULT_SECRETS);
+            // Drop removed provider secrets instead of keeping unused API keys around.
+            secrets.ProviderSecrets = {
+                siliconflow: (secrets.ProviderSecrets && secrets.ProviderSecrets.siliconflow) || "",
+            };
+            chrome.storage.local.set({ ProviderSecrets: secrets.ProviderSecrets }, () => resolve(secrets));
+        });
+    });
+}
+
+async function setProviderSecret(provider, key) {
+    if (provider !== "siliconflow") return Promise.resolve();
+    const local = await getOrSetLocalSecrets();
+    local.ProviderSecrets.siliconflow = (key || "").trim();
+    return new Promise((resolve) => {
+        chrome.storage.local.set({ ProviderSecrets: local.ProviderSecrets }, resolve);
+    });
+}
+
+function migrateLegacyApiKey() {
+    return getOrSetDefaultSettings(["TranslationService", "ApiKey"], DEFAULT_SETTINGS)
+        .then((result) => !!result.ApiKey);
+}
+
+export {
+    DEFAULT_SETTINGS,
+    DEFAULT_SECRETS,
+    setDefaultSettings,
+    getOrSetDefaultSettings,
+    getOrSetLocalSecrets,
+    setProviderSecret,
+    migrateLegacyApiKey,
+};

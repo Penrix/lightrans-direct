@@ -8,10 +8,22 @@
     <body>
         <div class="frame">
             <div class="row">
+                <div class="col">
+                    <div class="selection">
+                        <select id="model" title="SiliconFlow 模型"></select>
+                    </div>
+                </div>
+            </div>
+
+            <button id="translatePage" type="button" title="使用当前 SiliconFlow 模型翻译当前网页">
+                翻译当前网页
+            </button>
+
+            <div class="row">
                 <div class="input-container">
-            <textarea id="translate_input" autofocus="autofocus"></textarea>
-            <button id="translateSubmit" title="翻译" class="arrow-button"></button>
-        </div>
+                    <textarea id="translate_input" autofocus="autofocus"></textarea>
+                    <button id="translateSubmit" title="翻译" class="arrow-button"></button>
+                </div>
             </div>
             <label
                 id="hint_message"
@@ -19,52 +31,40 @@
                 for="translate_input"
                 data-i18n-name="InputHint"
             ></label>
-            <!-- 移除了谷歌网页翻译链接，现在使用统一的翻译引擎 -->
+
             <div id="setting" style="display: block;">
-            <div class="row" style="align-items: flex-end">
-                <div class="col">
-                    <div class="selection">
-                        <select id="sl">
-                            <option
-                                class="i18n"
-                                value="auto"
-                                data-i18n-name="AutoDetect"
-                            ></option>
-                        </select>
+                <div class="row" style="align-items: flex-end">
+                    <div class="col">
+                        <div class="selection">
+                            <select id="sl">
+                                <option
+                                    class="i18n"
+                                    value="auto"
+                                    data-i18n-name="AutoDetect"
+                                ></option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-                <i
-                    class="translate-icon translate-icon-exchange"
-                    id="exchange"
-                    title="交换两种语言"
-                ></i>
-                <div class="col">
-                    <div class="selection">
-                        <select id="tl"></select>
+                    <i
+                        class="translate-icon translate-icon-exchange"
+                        id="exchange"
+                        title="交换两种语言"
+                    ></i>
+                    <div class="col">
+                        <div class="selection">
+                            <select id="tl"></select>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        </div>
+
         <div id="result" class="result-container">
             <div id="translated-text"></div>
         </div>
 
         <footer>
-            <div class="footer-sponsor">
-                <a href="https://siliconflow.cn/" target="_blank" rel="noopener noreferrer">
-                    <img src="../img/SiliconFlow.png" alt="SiliconFlow" />
-                </a>
-            </div>
-            ©2026
-            <a href="https://github.com/W4J1e/Lightrans" target="_blank">
-                lightrans
-            </a>
-            <span class="space"></span>
-            by
-            <a href="https://hin.cool" target="_blank">
-                W4J1e
-            </a>
+            Lightrans Direct · SiliconFlow Direct
         </footer>
     </body>
 

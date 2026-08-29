@@ -11,37 +11,23 @@
     <body>
         <div id="option">
             <header>
-            <img src="../icon/icon128.png" />
-            <span class="space"></span>
-            <span class="space"></span>
-            轻量翻译
-        </header>
+                <img src="../icon/icon128.png" />
+                <span class="space"></span>
+                <span class="space"></span>
+                Lightrans Direct
+            </header>
+
             <div class="content">
-                <label class="setting-title">翻译服务</label>
+                <label class="setting-title">翻译服务（直连 SiliconFlow）</label>
                 <div class="row">
                     <div class="column">
-                        <label
-                            class="checked-label"
-                            style="justify-content: flex-start; gap: 8px;"
-                        >
-                            服务模式：
-                            <select
-                                id="translation-service"
-                                setting-type="select"
-                                setting-path="TranslationService"
-                                class="translator-config"
-                            >
-                                <option value="free">硅基流动（免费）</option>
-                                <option value="custom">硅基流动（自定义）</option>
-                            </select>
+                        <label class="checked-label" style="justify-content: flex-start; gap: 8px;">
+                            Provider：
+                            <strong>SiliconFlow</strong>
                         </label>
                     </div>
                     <div class="column">
-                        <label
-                            for="ai-model"
-                            class="checked-label"
-                            style="justify-content: flex-start; gap: 8px;"
-                        >
+                        <label for="ai-model" class="checked-label" style="justify-content: flex-start; gap: 8px;">
                             翻译模型：
                             <select
                                 id="ai-model"
@@ -55,10 +41,10 @@
                                 setting-type="text"
                                 setting-path="CustomModelName"
                                 class="translator-config"
-                                placeholder="输入模型名称，如 Qwen/Qwen3-8B"
+                                placeholder="输入 SiliconFlow 支持的模型 ID"
                                 style="display: none; flex: 1 1 auto; min-width: 0;"
                             />
-                            <span id="custom-model-col" style="display: none; margin-left: 8px;">
+                            <span id="custom-model-col" style="margin-left: 8px;">
                                 <input
                                     type="checkbox"
                                     id="custom-model"
@@ -72,44 +58,76 @@
                         </label>
                     </div>
                 </div>
-                <div class="row" id="apikey-row" style="display: none;">
+
+                <div class="row" id="apikey-row">
                     <div class="column" style="flex: 1 1 auto; min-width: 0;">
-                        <label
-                            for="api-key"
-                            class="checked-label"
-                            style="justify-content: flex-start; gap: 8px; width: 100%;"
-                        >
-                            <span style="white-space: nowrap;">API Key：</span>
+                        <label for="api-key" class="checked-label" style="justify-content: flex-start; gap: 8px; width: 100%;">
+                            <span style="white-space: nowrap;">SiliconFlow API Key：</span>
                             <input
                                 id="api-key"
                                 type="password"
-                                setting-type="password"
-                                setting-path="ApiKey"
                                 class="translator-config"
-                                placeholder="硅基流动（自定义）模式下填写你的 SiliconFlow API Key"
+                                autocomplete="off"
+                                spellcheck="false"
+                                placeholder="仅保存在本机浏览器中的 SiliconFlow API Key"
                                 style="flex: 1 1 auto; min-width: 0; width: 100%;"
                             />
                         </label>
                     </div>
                 </div>
+                <div class="row">
+                    <div class="column" style="flex: 1 1 auto;">
+                        <div style="font-size: 13px; opacity: 0.78; line-height: 1.55;">
+                            网页文本直接发送到 SiliconFlow；本扩展不经过开发者中继服务器。API Key 只保存在本机 chrome.storage.local。
+                        </div>
+                    </div>
+                </div>
 
-                <label
-                    for="layout-settings"
-                    class="setting-title i18n"
-                    data-i18n-name="LayoutSettings"
-                ></label>
+                <label class="setting-title">固定术语（可选）</label>
+                <div id="terminology-settings">
+                    <div class="row">
+                        <div class="column">
+                            <input
+                                type="checkbox"
+                                setting-type="switch"
+                                setting-path="GlossaryEnabled"
+                                class="switch"
+                                id="glossary-enabled"
+                            />
+                            <span class="space"></span>
+                            <label for="glossary-enabled" class="checked-label">启用固定术语表</label>
+                        </div>
+                        <div class="column" style="font-size: 12px; opacity: 0.72; line-height: 1.4;">
+                            默认所有英文按普通翻译处理，不自动加注释。
+                        </div>
+                    </div>
+                    <div class="row" style="padding-top: 2px; padding-bottom: 4px;">
+                        <div class="column" style="flex: 1 1 auto; min-width: 0; max-width: 100%; display: block;">
+                            <label for="glossary-text" class="checked-label" style="display: block; line-height: 1.4;">
+                                固定术语表：每行 <code>原词 = 最终显示文本</code>
+                            </label>
+                            <textarea
+                                id="glossary-text"
+                                rows="2"
+                                spellcheck="false"
+                                placeholder="API = 应用程序编程接口"
+                                style="width: 100%; height: 54px; min-height: 54px; max-height: 160px; box-sizing: border-box; margin-top: 4px; padding: 7px 10px; resize: vertical; border: 1px solid #d8dee8; border-radius: 8px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
+                            ></textarea>
+                            <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; font-size: 11px; opacity: 0.68; line-height: 1.35;">
+                                <span>只有你手动填写的规则会覆盖普通翻译；模型不会自动生成“英文（中文解释）”。</span>
+                                <span id="glossary-status" style="white-space: nowrap;"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <label for="layout-settings" class="setting-title i18n" data-i18n-name="LayoutSettings"></label>
                 <div id="layout-settings">
                     <div class="row">
                         <div class="column">
-                            <label
-                                class="checked-label"
-                                style="justify-content: flex-start; gap: 8px;"
-                            >
+                            <label class="checked-label" style="justify-content: flex-start; gap: 8px;">
                                 页面翻译：
-                                <select
-                                    setting-type="select"
-                                    setting-path="PageTranslationDisplayMode"
-                                >
+                                <select setting-type="select" setting-path="PageTranslationDisplayMode">
                                     <option value="original">仅原文</option>
                                     <option value="translated">仅译文</option>
                                     <option value="bilingual">对照（原文 + 译文）</option>
@@ -129,26 +147,10 @@
                                     value="SelectTranslatePosition"
                                     setting-path="LayoutSettings SelectTranslatePosition"
                                 >
-                                    <option
-                                        value="TopRight"
-                                        data-i18n-name="TopRight"
-                                        class="i18n"
-                                    ></option>
-                                    <option
-                                        value="TopLeft"
-                                        data-i18n-name="TopLeft"
-                                        class="i18n"
-                                    ></option>
-                                    <option
-                                        value="BottomRight"
-                                        data-i18n-name="BottomRight"
-                                        class="i18n"
-                                    ></option>
-                                    <option
-                                        value="BottomLeft"
-                                        data-i18n-name="BottomLeft"
-                                        class="i18n"
-                                    ></option>
+                                    <option value="TopRight" data-i18n-name="TopRight" class="i18n"></option>
+                                    <option value="TopLeft" data-i18n-name="TopLeft" class="i18n"></option>
+                                    <option value="BottomRight" data-i18n-name="BottomRight" class="i18n"></option>
+                                    <option value="BottomLeft" data-i18n-name="BottomLeft" class="i18n"></option>
                                 </select>
                             </label>
                         </div>
@@ -164,11 +166,7 @@
                                 id="Resize"
                             />
                             <span class="space"></span>
-                            <label
-                                for="Resize"
-                                class="checked-label i18n"
-                                data-i18n-name="ResizeSetting"
-                            ></label>
+                            <label for="Resize" class="checked-label i18n" data-i18n-name="ResizeSetting"></label>
                         </div>
                         <div class="column">
                             <input
@@ -180,20 +178,12 @@
                                 id="FoldLongContent"
                             />
                             <span class="space"></span>
-                            <label
-                                for="FoldLongContent"
-                                class="checked-label i18n"
-                                data-i18n-name="FoldLongContentSetting"
-                            ></label>
+                            <label for="FoldLongContent" class="checked-label i18n" data-i18n-name="FoldLongContentSetting"></label>
                         </div>
                     </div>
                 </div>
 
-                <label
-                    for="other-settings"
-                    class="setting-title i18n"
-                    data-i18n-name="OtherSettings"
-                ></label>
+                <label for="other-settings" class="setting-title i18n" data-i18n-name="OtherSettings"></label>
                 <div id="other-settings">
                     <div class="row">
                         <div class="column">
@@ -205,11 +195,7 @@
                                 id="mutual-translate"
                             />
                             <span class="space"></span>
-                            <label
-                                for="mutual-translate"
-                                class="checked-label i18n"
-                                data-i18n-name="MutualTranslation"
-                            ></label>
+                            <label for="mutual-translate" class="checked-label i18n" data-i18n-name="MutualTranslation"></label>
                         </div>
                         <div class="column">
                             <input
@@ -220,11 +206,7 @@
                                 id="select-translate"
                             />
                             <span class="space"></span>
-                            <label
-                                for="select-translate"
-                                class="checked-label i18n"
-                                data-i18n-name="SelectTranslate"
-                            ></label>
+                            <label for="select-translate" class="checked-label i18n" data-i18n-name="SelectTranslate"></label>
                         </div>
                     </div>
                     <div class="row">
@@ -237,11 +219,7 @@
                                 id="use-pdf-js"
                             />
                             <span class="space"></span>
-                            <label
-                                for="use-pdf-js"
-                                class="checked-label i18n"
-                                data-i18n-name="UsePDFjs"
-                            ></label>
+                            <label for="use-pdf-js" class="checked-label i18n" data-i18n-name="UsePDFjs"></label>
                         </div>
                         <div class="column">
                             <input
@@ -252,11 +230,7 @@
                                 id="translate-after-select"
                             />
                             <span class="space"></span>
-                            <label
-                                for="translate-after-select"
-                                class="checked-label i18n"
-                                data-i18n-name="TranslateAfterSelect"
-                            ></label>
+                            <label for="translate-after-select" class="checked-label i18n" data-i18n-name="TranslateAfterSelect"></label>
                         </div>
                     </div>
                     <div class="row">
@@ -269,11 +243,7 @@
                                 id="translate-after-dbl-click"
                             />
                             <span class="space"></span>
-                            <label
-                                for="translate-after-dbl-click"
-                                class="checked-label i18n"
-                                data-i18n-name="TranslateAfterDblClick"
-                            ></label>
+                            <label for="translate-after-dbl-click" class="checked-label i18n" data-i18n-name="TranslateAfterDblClick"></label>
                         </div>
                         <div class="column">
                             <input
@@ -284,29 +254,19 @@
                                 id="cancel-text-selection"
                             />
                             <span class="space"></span>
-                            <label
-                                for="cancel-text-selection"
-                                class="checked-label i18n"
-                                data-i18n-name="CancelTextSelection"
-                            ></label>
+                            <label for="cancel-text-selection" class="checked-label i18n" data-i18n-name="CancelTextSelection"></label>
                         </div>
                     </div>
-
                 </div>
             </div>
+
             <footer>
-                <div class="footer-sponsor" style="text-align: center;">
-                    <a href="https://siliconflow.cn/" target="_blank" rel="noopener noreferrer">
-                        <img src="../img/SiliconFlow.png" alt="SiliconFlow" style="height: 28px; margin: 0 auto 10px; display: block;" />
-                    </a>
-                </div>
                 ©2026
-                <a href="https://github.com/W4J1e/Lightrans" target="_blank">
-                    lightrans
-                </a>
+                <a href="https://github.com/Penrix/lightrans-direct" target="_blank" rel="noopener noreferrer">Lightrans Direct</a>
                 <span class="space"></span>
-                by
-                <a href="https://hin.cool" target="_blank"> W4J1e </a>
+                · based on
+                <a href="https://github.com/W4J1e/Lightrans" target="_blank" rel="noopener noreferrer">Lightrans</a>
+                / EdgeTranslate
             </footer>
         </div>
     </body>

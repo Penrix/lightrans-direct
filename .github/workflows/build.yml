@@ -1,0 +1,68 @@
+name: Build extension
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Guard direct-provider privacy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCAN_PATHS=(packages/lightrans/src packages/lightrans/config packages/translators/src)
+          FORBIDDEN='trans\.hin\.cool|X-Lightrans-Token|RELAY_TOKEN|UseGoogleAnalytics|deepl_injector|VITE_SILICONFLOW_API_KEY|generativelanguage\.googleapis\.com'
+          if grep -R -n -E "$FORBIDDEN" "${SCAN_PATHS[@]}"; then
+            echo "Forbidden relay/analytics/removed-provider integration found in source."
+            exit 1
+          fi
+          if grep -R -n 'setting-path="ApiKey"' packages/lightrans/src; then
+            echo "API Key must not be handled by synced generic settings."
+            exit 1
+          fi
+          grep -q 'https://api.siliconflow.cn/v1/chat/completions' packages/translators/src/translators/aitrans.ts
+          grep -q 'GlossaryText' packages/translators/src/translators/aitrans.ts
+          grep -q 'ZXQTERM' packages/translators/src/translators/aitrans.ts
+
+      - name: Install translator dependencies
+        run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
+
+      - name: Build translators
+        run: npm run build --prefix packages/translators
+
+      - name: Install extension dependencies
+        run: npm install --prefix packages/lightrans --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: Build Chrome extension
+        run: npm run build:chrome --prefix packages/lightrans
+
+      - name: Build Firefox extension
+        run: npm run build:firefox --prefix packages/lightrans
+
+      - name: Upload Chrome build
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightrans-direct-chrome
+          path: packages/lightrans/build/chrome
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Firefox build
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightrans-direct-firefox
+          path: packages/lightrans/build/firefox
+          if-no-files-found: error
+          retention-days: 14
