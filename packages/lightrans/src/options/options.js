@@ -1,4 +1,3 @@
-import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
 import {
     DEFAULT_SETTINGS,
@@ -6,8 +5,6 @@ import {
     getOrSetLocalSecrets,
     setProviderSecret,
 } from "common/scripts/settings.js";
-
-const channel = new Channel();
 
 const PROVIDER_MODELS = {
     siliconflow: [
@@ -28,7 +25,6 @@ window.onload = async () => {
     const apiKeyInput = document.getElementById("api-key");
     const apiKeyProviderLabel = document.getElementById("apikey-provider-label");
     const privacyNote = document.getElementById("provider-privacy-note");
-    const customModelCol = document.getElementById("custom-model-col");
     const customModelCheckbox = document.getElementById("custom-model");
     const aiModelSelect = document.getElementById("ai-model");
     const aiModelInput = document.getElementById("ai-model-input");
@@ -55,6 +51,12 @@ window.onload = async () => {
         const checked = customModelCheckbox.checked;
         if (aiModelSelect) aiModelSelect.style.display = checked ? "none" : "";
         if (aiModelInput) aiModelInput.style.display = checked ? "" : "none";
+
+        if (checked && aiModelInput && aiModelInput.value.trim()) {
+            saveOption(settings, ["AIModel"], aiModelInput.value.trim());
+        } else if (!checked && aiModelSelect && aiModelSelect.value) {
+            saveOption(settings, ["AIModel"], aiModelSelect.value);
+        }
     }
 
     function syncProviderUi() {
@@ -144,19 +146,28 @@ window.onload = async () => {
         serviceSelect.addEventListener("change", () => {
             const provider = currentProvider();
             const defaultModel = PROVIDER_MODELS[provider][0];
+
+            if (customModelCheckbox && customModelCheckbox.checked) {
+                customModelCheckbox.checked = false;
+                saveOption(settings, ["CustomModel"], false);
+            }
+
             populateModels(provider, defaultModel);
             saveOption(settings, ["AIModel"], defaultModel);
-            settings.AIModel = defaultModel;
             syncProviderUi();
         });
     }
 
-    if (aiModelSelect) {
-        aiModelSelect.value = settings.AIModel;
-    }
-
     if (customModelCheckbox) {
         customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
+    }
+
+    if (aiModelInput) {
+        aiModelInput.addEventListener("input", () => {
+            if (customModelCheckbox && customModelCheckbox.checked && aiModelInput.value.trim()) {
+                saveOption(settings, ["AIModel"], aiModelInput.value.trim());
+            }
+        });
     }
 
     if (apiKeyInput) {
