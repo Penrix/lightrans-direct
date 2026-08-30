@@ -94,7 +94,10 @@ export default function CompactPanel() {
         } else {
             // Rare fallback for shadow-DOM selections without a usable range rect.
             left = (window.innerWidth - panelRect.width) / 2;
-            top = Math.min(window.innerHeight * 0.3, window.innerHeight - panelRect.height - VIEWPORT_MARGIN);
+            top = Math.min(
+                window.innerHeight * 0.3,
+                window.innerHeight - panelRect.height - VIEWPORT_MARGIN
+            );
         }
 
         left = Math.max(
@@ -112,7 +115,7 @@ export default function CompactPanel() {
     }, [currentSelectionRect, fallbackAnchorRect]);
 
     const copyTranslation = useCallback(async () => {
-        const text = view.text || "";
+        const text = window.translateResult?.mainMeaning || "";
         if (!text) return;
         try {
             if (navigator.clipboard?.writeText) {
@@ -131,7 +134,7 @@ export default function CompactPanel() {
         textarea.select();
         document.execCommand("copy");
         textarea.remove();
-    }, [view.text]);
+    }, []);
 
     useEffect(() => {
         const cancelers = [];
