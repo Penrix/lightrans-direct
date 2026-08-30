@@ -62,16 +62,16 @@ class BannerController {
 
     /**
      * Keep the visible page in its original state while AI page translation is
-     * still running. The background scheduler may continue batching and running
-     * requests concurrently, but users only see the translated page after every
-     * text entry has a result (including fallback-to-original results).
+     * still running. The scheduler may continue batching and running requests
+     * concurrently for throughput, but users only see the translated page after
+     * every text entry has a result (including fallback-to-original results).
      *
      * The injected page translator stores source nodes in
      * window.lightransOriginalTextNodes and adds translatedText to each entry as
-     * batches complete. Because MutationObserver callbacks run before the next
-     * paint, restoring partial replacements here prevents the page from visibly
-     * changing section by section. When all entries are ready, the guard stops
-     * and the translator's final applyMode() result is left untouched.
+     * batches complete. MutationObserver runs before browser paint, so restoring
+     * partial replacements here prevents visible section-by-section translation.
+     * Once all entries are ready, the guard stops and the translator's final
+     * applyMode() result is left untouched.
      */
     startAtomicAIPageView() {
         if (this.atomicPageCanceller) {
