@@ -11,9 +11,92 @@ const channel = new Channel();
 const MAX_Z_INDEX = 2147483647;
 const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
+const CHATGPT_HOST_RE = /(^|\.)chatgpt\.com$/i;
 
 window.translateResult = window.translateResult || {};
 window.isDisplayingResult = false;
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(value, max));
+}
+
+function rectsOverlap(a, b) {
+    return !(
+        a.right <= b.left ||
+        a.left >= b.right ||
+        a.bottom <= b.top ||
+        a.top >= b.bottom
+    );
+}
+
+function isOpenPopover(element) {
+    try {
+        return element.matches?.(":popover-open") || false;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Check whether an element (or one of its ancestors) behaves like a floating
+ * contextual UI. Native popovers live in the browser top layer, so even our
+ * maximum z-index cannot cover them; those must be avoided geometrically.
+ */
+function isFloatingOverlay(element, panel) {
+    let current = element;
+    while (current && current !== document.documentElement) {
+        if (panel?.contains(current)) return false;
+        if (!(current instanceof Element)) break;
+
+        const role = current.getAttribute("role") || "";
+        const style = window.getComputedStyle(current);
+        const position = style.position;
+        const zIndex = Number.parseInt(style.zIndex, 10);
+
+        if (isOpenPopover(current)) return true;
+
+        if (["dialog", "menu", "toolbar", "listbox", "tooltip"].includes(role)) {
+            if (["fixed", "absolute", "sticky"].includes(position)) return true;
+        }
+
+        if (
+            ["fixed", "absolute", "sticky"].includes(position) &&
+            Number.isFinite(zIndex) &&
+            zIndex >= 10 &&
+            style.pointerEvents !== "none"
+        ) {
+            return true;
+        }
+
+        current = current.parentElement;
+    }
+    return false;
+}
+
+function overlayScoreForRect(rect, panel) {
+    const inset = 4;
+    const xs = [rect.left + inset, (rect.left + rect.right) / 2, rect.right - inset];
+    const ys = [rect.top + inset, (rect.top + rect.bottom) / 2, rect.bottom - inset];
+    const seen = new Set();
+    let score = 0;
+
+    xs.forEach((x) => {
+        ys.forEach((y) => {
+            if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return;
+            const elements = document.elementsFromPoint(x, y);
+            for (const element of elements) {
+                if (seen.has(element)) continue;
+                seen.add(element);
+                if (isFloatingOverlay(element, panel)) {
+                    score += 1;
+                    break;
+                }
+            }
+        });
+    });
+
+    return score;
+}
 
 export default function CompactPanel() {
     const [view, setView] = useState({
@@ -83,14 +166,87 @@ export default function CompactPanel() {
         let top;
 
         if (anchor) {
-            const anchorCenter = anchor.left + (anchor.width || 0) / 2;
-            left = anchorCenter - panelRect.width / 2;
+            const panelWidth = panelRect.width;
+            const panelHeight = panelRect.height;
+            const anchorWidth = anchor.width || Math.max(0, anchor.right - anchor.left);
+            const anchorHeight = anchor.height || Math.max(0, anchor.bottom - anchor.top);
+            const anchorCenterX = anchor.left + anchorWidth / 2;
+            const anchorCenterY = anchor.top + anchorHeight / 2;
 
-            // Prefer above the selection. Flip below only when there is not enough room.
-            top = anchor.top - panelRect.height - ANCHOR_GAP;
-            if (top < VIEWPORT_MARGIN) {
-                top = anchor.bottom + ANCHOR_GAP;
-            }
+            const candidatesByName = {
+                above: {
+                    name: "above",
+                    left: anchorCenterX - panelWidth / 2,
+                    top: anchor.top - panelHeight - ANCHOR_GAP,
+                },
+                below: {
+                    name: "below",
+                    left: anchorCenterX - panelWidth / 2,
+                    top: anchor.bottom + ANCHOR_GAP,
+                },
+                right: {
+                    name: "right",
+                    left: anchor.right + ANCHOR_GAP,
+                    top: anchorCenterY - panelHeight / 2,
+                },
+                left: {
+                    name: "left",
+                    left: anchor.left - panelWidth - ANCHOR_GAP,
+                    top: anchorCenterY - panelHeight / 2,
+                },
+            };
+
+            // ChatGPT's own selection actions occupy the space above selected text.
+            // Prefer below there, while still using collision scoring so this stays
+            // resilient if ChatGPT changes its menu placement later.
+            const preference = CHATGPT_HOST_RE.test(window.location.hostname)
+                ? ["below", "right", "left", "above"]
+                : ["above", "below", "right", "left"];
+
+            const anchorRect = {
+                left: anchor.left,
+                right: anchor.right,
+                top: anchor.top,
+                bottom: anchor.bottom,
+            };
+
+            const candidates = preference.map((name, preferenceIndex) => {
+                const raw = candidatesByName[name];
+                const candidateLeft = clamp(
+                    raw.left,
+                    VIEWPORT_MARGIN,
+                    Math.max(VIEWPORT_MARGIN, window.innerWidth - panelWidth - VIEWPORT_MARGIN)
+                );
+                const candidateTop = clamp(
+                    raw.top,
+                    VIEWPORT_MARGIN,
+                    Math.max(VIEWPORT_MARGIN, window.innerHeight - panelHeight - VIEWPORT_MARGIN)
+                );
+                const rect = {
+                    left: candidateLeft,
+                    right: candidateLeft + panelWidth,
+                    top: candidateTop,
+                    bottom: candidateTop + panelHeight,
+                };
+
+                const overlayScore = overlayScoreForRect(rect, panel);
+                const overlapsSelection = rectsOverlap(rect, anchorRect);
+                const clampDistance = Math.abs(candidateLeft - raw.left) + Math.abs(candidateTop - raw.top);
+
+                return {
+                    left: candidateLeft,
+                    top: candidateTop,
+                    score:
+                        overlayScore * 1000 +
+                        (overlapsSelection ? 500 : 0) +
+                        clampDistance * 0.05 +
+                        preferenceIndex,
+                };
+            });
+
+            candidates.sort((a, b) => a.score - b.score);
+            left = candidates[0].left;
+            top = candidates[0].top;
         } else {
             // Rare fallback for shadow-DOM selections without a usable range rect.
             left = (window.innerWidth - panelRect.width) / 2;
@@ -100,13 +256,15 @@ export default function CompactPanel() {
             );
         }
 
-        left = Math.max(
+        left = clamp(
+            left,
             VIEWPORT_MARGIN,
-            Math.min(left, window.innerWidth - panelRect.width - VIEWPORT_MARGIN)
+            Math.max(VIEWPORT_MARGIN, window.innerWidth - panelRect.width - VIEWPORT_MARGIN)
         );
-        top = Math.max(
+        top = clamp(
+            top,
             VIEWPORT_MARGIN,
-            Math.min(top, window.innerHeight - panelRect.height - VIEWPORT_MARGIN)
+            Math.max(VIEWPORT_MARGIN, window.innerHeight - panelRect.height - VIEWPORT_MARGIN)
         );
 
         panel.style.left = `${Math.round(left)}px`;
@@ -212,6 +370,13 @@ export default function CompactPanel() {
         if (!view.open) return undefined;
 
         let raf = requestAnimationFrame(positionPanel);
+        const delayedRepositions = [70, 180, 420].map((delay) =>
+            window.setTimeout(() => {
+                cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(positionPanel);
+            }, delay)
+        );
+
         const reposition = () => {
             cancelAnimationFrame(raf);
             raf = requestAnimationFrame(positionPanel);
@@ -231,6 +396,7 @@ export default function CompactPanel() {
 
         return () => {
             cancelAnimationFrame(raf);
+            delayedRepositions.forEach((timer) => window.clearTimeout(timer));
             window.removeEventListener("resize", reposition);
             window.removeEventListener("scroll", reposition, true);
             document.removeEventListener("mousedown", onPointerDown, true);
