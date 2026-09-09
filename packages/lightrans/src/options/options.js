@@ -24,6 +24,9 @@ window.onload = async () => {
     const aiModelInput = document.getElementById("ai-model-input");
     const glossaryText = document.getElementById("glossary-text");
     const glossaryStatus = document.getElementById("glossary-status");
+    const englishOnlyCheckbox = document.getElementById("english-to-zh-only");
+    const mutualTranslateCheckbox = document.getElementById("mutual-translate");
+    const mutualTranslateColumn = document.getElementById("mutual-translate-column");
 
     function populateModels(selectedModel) {
         if (!aiModelSelect) return;
@@ -47,6 +50,18 @@ window.onload = async () => {
             saveOption(settings, ["AIModel"], aiModelInput.value.trim());
         } else if (!checked && aiModelSelect && aiModelSelect.value) {
             saveOption(settings, ["AIModel"], aiModelSelect.value);
+        }
+    }
+
+    function syncTranslationDirectionControls() {
+        if (!englishOnlyCheckbox || !mutualTranslateCheckbox) return;
+        const oneWay = englishOnlyCheckbox.checked;
+        mutualTranslateCheckbox.disabled = oneWay;
+        if (mutualTranslateColumn) {
+            mutualTranslateColumn.style.opacity = oneWay ? "0.42" : "1";
+            mutualTranslateColumn.title = oneWay
+                ? "已启用“仅英语 → 简体中文”，互译模式暂不生效。"
+                : "";
         }
     }
 
@@ -127,6 +142,10 @@ window.onload = async () => {
         customModelCheckbox.addEventListener("change", syncCustomModelVisibility);
     }
 
+    if (englishOnlyCheckbox) {
+        englishOnlyCheckbox.addEventListener("change", syncTranslationDirectionControls);
+    }
+
     if (aiModelInput) {
         aiModelInput.addEventListener("input", () => {
             if (customModelCheckbox && customModelCheckbox.checked && aiModelInput.value.trim()) {
@@ -167,6 +186,7 @@ window.onload = async () => {
     settings.TranslationService = "siliconflow";
     chrome.storage.sync.set({ TranslationService: "siliconflow" });
     syncCustomModelVisibility();
+    syncTranslationDirectionControls();
 };
 
 function getSetting(localSettings, settingItemPath) {
