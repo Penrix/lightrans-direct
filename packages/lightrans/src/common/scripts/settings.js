@@ -17,6 +17,10 @@ const DEFAULT_SETTINGS = {
     },
     languageSetting: { sl: "auto", tl: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()] },
     OtherSettings: {
+        // Lightrans Direct defaults to the user's main use case: English input only,
+        // always translated to Simplified Chinese. MutualTranslate is retained as
+        // the legacy fallback when this switch is disabled.
+        EnglishToSimplifiedChineseOnly: true,
         MutualTranslate: true,
         SelectTranslate: true,
         TranslateAfterDblClick: false,
@@ -118,6 +122,18 @@ function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
                     stored[setting] = defaults[setting];
                     updated = true;
                 }
+            }
+
+            // Existing installations already have an OtherSettings object, so a
+            // new nested default would otherwise not be populated until an actual
+            // extension update event. Migrate it on ordinary settings reads too.
+            if (
+                requested.includes("OtherSettings") &&
+                stored.OtherSettings &&
+                stored.OtherSettings.EnglishToSimplifiedChineseOnly === undefined
+            ) {
+                stored.OtherSettings.EnglishToSimplifiedChineseOnly = true;
+                updated = true;
             }
 
             // Normalize relay-era and removed-provider values.
