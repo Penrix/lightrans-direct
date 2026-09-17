@@ -14,63 +14,32 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Download exact pinned inputs
+      - name: Download exact verified APK pair
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p work tmp-youtube-bundle/app/src/main/assets out
-          curl -fL --retry 5 --retry-all-errors -o work/morphe.jar \
-            https://github.com/MorpheApp/morphe-desktop/releases/download/v1.15.1/morphe-desktop-1.15.1-all.jar
-          echo '6ae9954cd4e22e61055cf9ef6b0bbd25556d2092f354031828f824dc0f7364e1  work/morphe.jar' | sha256sum -c -
+          mkdir -p tmp-youtube-bundle/app/src/main/assets out
 
-          curl -fL --retry 5 --retry-all-errors -o work/patches.mpp \
-            https://github.com/MorpheApp/morphe-patches/releases/download/v1.42.0/patches-1.42.0.mpp
-          echo 'e1b1ca9bed58861266c837ee14e23d9901999d1d772e66c7f1f7fa79a641d078  work/patches.mpp' | sha256sum -c -
-
-          curl -fL --retry 5 --retry-all-errors -A 'Mozilla/5.0' -e 'https://apkpure.net/' \
-            -o work/youtube.apk \
-            'https://d.apkpure.net/b/APK/com.google.android.youtube?versionCode=1561063732'
-          echo 'c193daf879d36e04886c34dcc44580b1c98c20534165d306c2a04b8025fc3f46  work/youtube.apk' | sha256sum -c -
+          curl -fL --retry 5 --retry-all-errors \
+            -o tmp-youtube-bundle/app/src/main/assets/YouTube-Morphe-21.13.164.apk \
+            https://github.com/j-hc/revanced-magisk-module/releases/download/20221085/youtube-morphe-v21.13.164-all.apk
+          echo '510a1049c9957fc7161ad0f5370d76457106af3a541c698ae5b3a546a263ad2e  tmp-youtube-bundle/app/src/main/assets/YouTube-Morphe-21.13.164.apk' | sha256sum -c -
 
           curl -fL --retry 5 --retry-all-errors \
             -o tmp-youtube-bundle/app/src/main/assets/Morphe-MicroG-7.1.1-arm64-v8a.apk \
             https://github.com/MorpheApp/MicroG-RE/releases/download/7.1.1/microg-7.1.1-arm64-v8a.apk
           echo '9246daa0985c4f7ab7aade0bc35cc6c089cba264778dbdbb41e7fdc2e97df046  tmp-youtube-bundle/app/src/main/assets/Morphe-MicroG-7.1.1-arm64-v8a.apk' | sha256sum -c -
-
-      - name: Recreate locked working YouTube
-        shell: bash
-        run: |
-          set -euxo pipefail
-          java -jar work/morphe.jar patch -p work/patches.mpp --exclusive \
-            -e 'GmsCore support' \
-            -e 'Hide ads' \
-            -e 'SponsorBlock' \
-            -e 'Video quality' \
-            -e 'Seekbar' \
-            -e 'Swipe controls' \
-            -e 'Hide related video overlay' \
-            -e 'Downloads' \
-            -e 'Return YouTube Dislike' \
-            -e 'Sanitize sharing links' \
-            -e 'Disable DRC audio' \
-            -e 'App refresh rate' \
-            -e 'Force original audio' \
-            -o tmp-youtube-bundle/app/src/main/assets/YouTube-Morphe-21.13.164.apk \
-            -r out/patch-report.json \
-            work/youtube.apk 2>&1 | tee out/patch.log
-          sha256sum tmp-youtube-bundle/app/src/main/assets/YouTube-Morphe-21.13.164.apk | tee out/youtube-sha256.txt
-          echo '510a1049c9957fc7161ad0f5370d76457106af3a541c698ae5b3a546a263ad2e  tmp-youtube-bundle/app/src/main/assets/YouTube-Morphe-21.13.164.apk' | sha256sum -c -
 
       - name: Build complete bundle APK
         shell: bash
@@ -81,8 +50,7 @@ jobs:
           sha256sum out/Penrix-YouTube-Complete.apk > out/SHA256SUMS.txt
           unzip -l out/Penrix-YouTube-Complete.apk | grep -E 'assets/(YouTube-Morphe-21.13.164|Morphe-MicroG-7.1.1-arm64-v8a)\.apk'
 
-      - name: Upload final bundle and diagnostics
-        if: always()
+      - name: Upload final bundle
         uses: actions/upload-artifact@v4
         with:
           name: Penrix-YouTube-Complete
