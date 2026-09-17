@@ -1,0 +1,28 @@
+name: tmp-youtube-oneclick
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    if: github.head_ref == 'tmp/youtube-oneclick-build-20260917' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build APK
+        working-directory: tmp/youtube-oneclick
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Penrix-YouTube-OneClick
+          path: tmp/youtube-oneclick/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
