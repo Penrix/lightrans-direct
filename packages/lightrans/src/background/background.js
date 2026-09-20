@@ -247,10 +247,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             try {
                 const texts = message.content.texts;
+                const sourceLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.sl || "auto";
                 const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
                 const translatedTexts = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(
                     texts,
-                    "auto",
+                    sourceLang,
                     targetLang
                 );
 
