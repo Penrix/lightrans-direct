@@ -37,8 +37,8 @@ const DEFAULT_SETTINGS = {
     PageTranslationDisplayMode: "translated",
     CustomModel: false,
     CustomModelName: "",
-    // Optional deterministic override layer. Normal translation does not auto-annotate
-    // or preserve English terms; only user-written glossary rules override model output.
+    // Optional deterministic override layer. Automatic source-language selection is
+    // resolved before translation; only user-written glossary rules override normal output.
     GlossaryEnabled: true,
     GlossaryText: "",
     HybridTranslatorConfig: {
