@@ -39,6 +39,9 @@ jobs:
       - name: Install translator dependencies
         run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
 
+      - name: Test translators
+        run: npm test --prefix packages/translators -- --runInBand
+
       - name: Build translators
         run: npm run build --prefix packages/translators
 
