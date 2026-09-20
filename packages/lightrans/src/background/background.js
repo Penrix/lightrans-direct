@@ -106,6 +106,108 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 const channel = new Channel();
 const TRANSLATOR_MANAGER = new TranslatorManager(channel);
 
+function englishToSimplifiedChineseOnly() {
+    return !!TRANSLATOR_MANAGER.OTHER_SETTINGS?.EnglishToSimplifiedChineseOnly;
+}
+
+function isEnglishLanguage(language) {
+    return /^en(?:-|$)/i.test(String(language || ""));
+}
+
+function unchangedTranslationResult(text) {
+    return {
+        originalText: text,
+        mainMeaning: text,
+        tPronunciation: "",
+        sPronunciation: "",
+        detailedMeanings: [],
+        definitions: [],
+        examples: [],
+        skipped: true,
+    };
+}
+
+/**
+ * In one-way mode, selection translation should not even open the result bubble
+ * for Chinese or other non-English text. AITranslator.detect() is local and does
+ * not spend an API request, so this gate is cheap and deterministic.
+ */
+const translateSelectionNormally = TRANSLATOR_MANAGER.translate.bind(TRANSLATOR_MANAGER);
+TRANSLATOR_MANAGER.translate = async function (text, position, selectionHeight = 0) {
+    await this.config_loader;
+    if (!this.OTHER_SETTINGS?.EnglishToSimplifiedChineseOnly) {
+        return translateSelectionNormally(text, position, selectionHeight);
+    }
+
+    const detected = await this.AI_TRANSLATOR.detect(text);
+    if (!isEnglishLanguage(detected)) {
+        return { skipped: true, sourceLanguage: detected };
+    }
+
+    const currentTabId = await this.getCurrentTabId();
+    if (currentTabId === -1) return { skipped: true };
+
+    const timestamp = new Date().getTime();
+    this.channel.emitToTabs(currentTabId, "start_translating", {
+        text,
+        position,
+        selectionHeight,
+        timestamp,
+    });
+
+    try {
+        const result = await this.AI_TRANSLATOR.translate(text, "en", "zh-CN");
+        result.sourceLanguage = "en";
+        result.targetLanguage = "zh-CN";
+        this.channel.emitToTabs(currentTabId, "translating_finished", {
+            timestamp,
+            ...result,
+        });
+        return result;
+    } catch (error) {
+        const message = String((error && (error.message || error.errorMsg)) || error);
+        let errorType = "API_ERR";
+        if (/transient|429|rate\s*limit|status code 5\d{2}/i.test(message)) {
+            errorType = "MODEL_BUSY";
+        } else if (/network|timeout|NET_ERR|ECONN|failed to fetch/i.test(message)) {
+            errorType = "NET_ERR";
+        }
+        this.channel.emitToTabs(currentTabId, "translating_error", {
+            error: {
+                errorType,
+                errorCode: 0,
+                errorMsg: message,
+            },
+            timestamp,
+        });
+        return { error: message };
+    }
+};
+
+/**
+ * Popup translation is registered inside TranslatorManager, so enforce the same
+ * one-way direction at the translator boundary. Non-English popup input is left
+ * unchanged instead of being translated into English.
+ */
+TRANSLATOR_MANAGER.config_loader.then(() => {
+    const translator = TRANSLATOR_MANAGER.AI_TRANSLATOR;
+    const translateNormally = translator.translate.bind(translator);
+    translator.translate = async (text, from, to) => {
+        if (!englishToSimplifiedChineseOnly()) {
+            return translateNormally(text, from, to);
+        }
+
+        let detected = from;
+        if (!detected || detected === "auto") {
+            detected = await translator.detect(text);
+        }
+        if (!isEnglishLanguage(detected)) {
+            return unchangedTranslationResult(text);
+        }
+        return translateNormally(text, "en", "zh-CN");
+    };
+});
+
 /**
  * Keep the page-translation context menu in sync with the active provider.
  * TranslatorManager updates its provider from the same storage event; a short
@@ -247,12 +349,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             try {
                 const texts = message.content.texts;
-                const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
-                const translatedTexts = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(
-                    texts,
-                    "auto",
-                    targetLang
-                );
+                let translatedTexts;
+
+                if (englishToSimplifiedChineseOnly()) {
+                    // Keep non-English segments exactly as they are. detect() is a
+                    // local regex-based check, so filtering does not add API calls.
+                    translatedTexts = texts.slice();
+                    const englishIndices = [];
+                    const englishTexts = [];
+
+                    for (let i = 0; i < texts.length; i++) {
+                        const detected = await TRANSLATOR_MANAGER.AI_TRANSLATOR.detect(texts[i]);
+                        if (isEnglishLanguage(detected)) {
+                            englishIndices.push(i);
+                            englishTexts.push(texts[i]);
+                        }
+                    }
+
+                    if (englishTexts.length > 0) {
+                        const batch = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(
+                            englishTexts,
+                            "en",
+                            "zh-CN"
+                        );
+                        englishIndices.forEach((originalIndex, translatedIndex) => {
+                            translatedTexts[originalIndex] = batch[translatedIndex];
+                        });
+                    }
+                } else {
+                    const sourceLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.sl || "auto";
+                    const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
+                    translatedTexts = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(
+                        texts,
+                        sourceLang,
+                        targetLang
+                    );
+                }
 
                 finish({
                     translatedContent: {

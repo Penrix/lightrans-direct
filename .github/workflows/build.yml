@@ -35,9 +35,14 @@ jobs:
           grep -q 'https://api.siliconflow.cn/v1/chat/completions' packages/translators/src/translators/aitrans.ts
           grep -q 'GlossaryText' packages/translators/src/translators/aitrans.ts
           grep -q 'ZXQTERM' packages/translators/src/translators/aitrans.ts
+          grep -q 'CompactPanel' packages/lightrans/src/content/display/index.js
+          grep -q 'text: detail.mainMeaning' packages/lightrans/src/content/display/CompactPanel.jsx
 
       - name: Install translator dependencies
         run: npm install --prefix packages/translators --legacy-peer-deps --no-audit --no-fund
+
+      - name: Test translators
+        run: npm test --prefix packages/translators -- --runInBand
 
       - name: Build translators
         run: npm run build --prefix packages/translators

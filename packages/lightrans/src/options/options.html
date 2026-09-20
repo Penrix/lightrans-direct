@@ -98,7 +98,7 @@
                             <label for="glossary-enabled" class="checked-label">启用固定术语表</label>
                         </div>
                         <div class="column" style="font-size: 12px; opacity: 0.72; line-height: 1.4;">
-                            默认所有英文按普通翻译处理，不自动加注释。
+                            自动源语言会先本地识别；普通英文无需加入术语表。
                         </div>
                     </div>
                     <div class="row" style="padding-top: 2px; padding-bottom: 4px;">
@@ -110,11 +110,11 @@
                                 id="glossary-text"
                                 rows="2"
                                 spellcheck="false"
-                                placeholder="API = 应用程序编程接口"
+                                placeholder="API = 应用程序编程接口&#10;OpenAI = OpenAI"
                                 style="width: 100%; height: 54px; min-height: 54px; max-height: 160px; box-sizing: border-box; margin-top: 4px; padding: 7px 10px; resize: vertical; border: 1px solid #d8dee8; border-radius: 8px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
                             ></textarea>
                             <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; font-size: 11px; opacity: 0.68; line-height: 1.35;">
-                                <span>只有你手动填写的规则会覆盖普通翻译；模型不会自动生成“英文（中文解释）”。</span>
+                                <span>术语表只用于你主动指定的固定译法或保留词；未配置的英文按正常英译中处理。</span>
                                 <span id="glossary-status" style="white-space: nowrap;"></span>
                             </div>
                         </div>
@@ -186,7 +186,23 @@
                 <label for="other-settings" class="setting-title i18n" data-i18n-name="OtherSettings"></label>
                 <div id="other-settings">
                     <div class="row">
-                        <div class="column">
+                        <div class="column" id="english-only-direction-column" style="align-items: flex-start;">
+                            <div style="display: flex; align-items: center;">
+                                <input
+                                    type="checkbox"
+                                    setting-type="switch"
+                                    setting-path="OtherSettings EnglishToSimplifiedChineseOnly"
+                                    class="switch"
+                                    id="english-to-zh-only"
+                                />
+                                <span class="space"></span>
+                                <label for="english-to-zh-only" class="checked-label">仅英语 → 简体中文</label>
+                            </div>
+                            <div style="font-size: 11px; opacity: 0.68; line-height: 1.35; margin-top: 4px; padding-left: 28px;">
+                                开启后，中文划词不会反向翻成英文；整页翻译只处理英语文本。
+                            </div>
+                        </div>
+                        <div class="column" id="mutual-translate-column">
                             <input
                                 type="checkbox"
                                 setting-type="switch"
@@ -197,6 +213,8 @@
                             <span class="space"></span>
                             <label for="mutual-translate" class="checked-label i18n" data-i18n-name="MutualTranslation"></label>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="column">
                             <input
                                 type="checkbox"
@@ -208,8 +226,6 @@
                             <span class="space"></span>
                             <label for="select-translate" class="checked-label i18n" data-i18n-name="SelectTranslate"></label>
                         </div>
-                    </div>
-                    <div class="row">
                         <div class="column">
                             <input
                                 type="checkbox"
@@ -221,6 +237,8 @@
                             <span class="space"></span>
                             <label for="use-pdf-js" class="checked-label i18n" data-i18n-name="UsePDFjs"></label>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="column">
                             <input
                                 type="checkbox"
@@ -232,8 +250,6 @@
                             <span class="space"></span>
                             <label for="translate-after-select" class="checked-label i18n" data-i18n-name="TranslateAfterSelect"></label>
                         </div>
-                    </div>
-                    <div class="row">
                         <div class="column">
                             <input
                                 type="checkbox"
@@ -245,6 +261,8 @@
                             <span class="space"></span>
                             <label for="translate-after-dbl-click" class="checked-label i18n" data-i18n-name="TranslateAfterDblClick"></label>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="column">
                             <input
                                 type="checkbox"
