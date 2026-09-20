@@ -72,7 +72,7 @@ window.onload = async () => {
             .map((line) => line.trim())
             .filter((line) => line && !line.startsWith("#") && (line.includes("=") || line.includes("=>")))
             .length;
-        glossaryStatus.textContent = `已配置 ${count} 条固定术语。每次出现都会按右侧文本显示。`;
+        glossaryStatus.textContent = `已配置 ${count} 条术语规则；只覆盖你明确指定的词。`;
     }
 
     populateModels(settings.AIModel);
