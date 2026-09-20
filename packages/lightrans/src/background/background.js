@@ -377,10 +377,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         });
                     }
                 } else {
+                    const sourceLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.sl || "auto";
                     const targetLang = TRANSLATOR_MANAGER.LANGUAGE_SETTING.tl;
                     translatedTexts = await TRANSLATOR_MANAGER.AI_TRANSLATOR.translateBatch(
                         texts,
-                        "auto",
+                        sourceLang,
                         targetLang
                     );
                 }
