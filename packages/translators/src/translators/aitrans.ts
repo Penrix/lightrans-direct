@@ -29,20 +29,35 @@ class AITranslator {
     private currentModel = "THUDM/GLM-4-9B-0414";
 
     async detect(text: string): Promise<string> {
-        if (/[\u4e00-\u9fa5]/.test(text)) {
-            return "zh-CN";
-        }
-        if (/^[a-zA-Z0-9\s\p{Punctuation}]*$/u.test(text)) {
-            return "en";
-        }
+        const value = text || "";
+        const hanCount = (value.match(/\p{Script=Han}/gu) || []).length;
+        const latinCount = (value.match(/\p{Script=Latin}/gu) || []).length;
+
+        if (hanCount === 0 && latinCount === 0) return "auto";
+        if (latinCount > hanCount) return "en";
+        if (hanCount > latinCount) return "zh-CN";
+
+        // Truly mixed text is better left unresolved than forced into the wrong
+        // source language. The translation prompt will fall back gracefully.
         return "auto";
     }
 
+    private async resolveSourceLanguage(from: string, text: string): Promise<string> {
+        const configured = (from || "auto").trim();
+        if (configured && configured !== "auto") return configured;
+
+        return this.detect(text);
+    }
+
     /**
-     * Translate directly through SiliconFlow. Translation is intentionally plain:
-     * the model is not asked to auto-annotate, preserve, or explain English terms.
-     * User-defined glossary entries are the only explicit override and are protected
-     * with deterministic placeholders before generation, then restored afterwards.
+     * Translate directly through SiliconFlow.
+     *
+     * "auto" is resolved locally whenever the script balance is clear, so the model
+     * normally receives an explicit language pair such as en -> zh-CN. This keeps
+     * ordinary English translation behavior natural without special term patches.
+     *
+     * User-defined glossary entries remain an intentional override layer and are
+     * protected with deterministic placeholders before generation, then restored.
      */
     private async requestTranslate(
         from: string,
@@ -57,6 +72,8 @@ class AITranslator {
         }
 
         const model = this.getSafeModel();
+        const resolvedFrom = await this.resolveSourceLanguage(from, text);
+        const sourceLabel = resolvedFrom === "auto" ? "the source language" : resolvedFrom;
         const preferences = await this.resolveTranslationPreferences();
         const protectedText = preferences.glossaryEnabled
             ? AITranslator.protectGlossary(text, preferences.glossary)
@@ -65,12 +82,10 @@ class AITranslator {
         const glossaryInstruction = protectedText.replacements.length > 0
             ? " Preserve every placeholder token matching ZXQTERM followed by four digits and QXZ exactly as written. Treat each placeholder as opaque: never translate it, annotate it, explain it, remove it, split it, or alter it."
             : "";
-        const plainTranslationInstruction =
-            " Translate all source-language content naturally into the target language. Do not add bilingual glosses, definitions, explanatory notes, or parenthetical explanations that are not present in the source. Do not intentionally keep English words merely to annotate them.";
 
         const systemPrompt = batch
-            ? `Translate each numbered segment from ${from} to ${to}. Keep every <N> tag exactly and return only tagged translations.${plainTranslationInstruction}${glossaryInstruction}`
-            : `Translate the text from ${from} to ${to}. Preserve meaning, tone and formatting. Return only the translation.${plainTranslationInstruction}${glossaryInstruction}`;
+            ? `Translate each numbered segment from ${sourceLabel} to ${to}. Keep every <N> tag exactly and return only tagged translations.${glossaryInstruction}`
+            : `Translate the text from ${sourceLabel} to ${to}. Preserve meaning, tone and formatting. Return only the translation.${glossaryInstruction}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
