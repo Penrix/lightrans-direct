@@ -18,12 +18,15 @@
             </header>
 
             <div class="content">
-                <label class="setting-title">翻译服务（直连 SiliconFlow）</label>
+                <label class="setting-title">翻译服务</label>
                 <div class="row">
                     <div class="column">
                         <label class="checked-label" style="justify-content: flex-start; gap: 8px;">
-                            Provider：
-                            <strong>SiliconFlow</strong>
+                            翻译服务：
+                            <select id="provider" setting-type="select" setting-path="TranslationService">
+                                <option value="ollama">本地 Ollama</option>
+                                <option value="siliconflow">硅基流动（云端）</option>
+                            </select>
                         </label>
                     </div>
                     <div class="column">
@@ -59,6 +62,9 @@
                     </div>
                 </div>
 
+                <div class="row" id="ollama-hint" style="font-size: 12px; opacity: 0.72;">
+                    使用本机 Ollama，无需 API Key。请保持 Ollama 运行；首次加载较慢，后续请求会保留模型 30 分钟。划词时参考附近段落，只输出所选文字的译文。
+                </div>
                 <div class="row" id="apikey-row">
                     <div class="column" style="flex: 1 1 auto; min-width: 0;">
                         <label for="api-key" class="checked-label" style="justify-content: flex-start; gap: 8px; width: 100%;">
@@ -78,7 +84,7 @@
                 <div class="row">
                     <div class="column" style="flex: 1 1 auto;">
                         <div style="font-size: 13px; opacity: 0.78; line-height: 1.55;">
-                            网页文本直接发送到 SiliconFlow；本扩展不经过开发者中继服务器。API Key 只保存在本机 chrome.storage.local。
+                            默认由本机 Ollama 翻译，文字留在本机。只有手动选择硅基流动时，待翻译文字才发送到云端；附近段落仅用于本地翻译。云端 API Key 只保存在本机浏览器中。
                         </div>
                     </div>
                 </div>
@@ -291,3 +297,4 @@
 
     <script src="./options.js"></script>
 </html>
+

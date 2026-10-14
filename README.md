@@ -1,12 +1,14 @@
 # Lightrans Direct
 
-一个以“**直连 SiliconFlow、无开发者中继、API Key 不同步**”为核心原则的 Lightrans 分支。
+一个默认使用 **本机 Ollama 翻译、SiliconFlow 手动备用、无开发者中继、API Key 不同步** 的 Lightrans 分支。
 
 本项目保留 Lightrans / EdgeTranslate 已经成熟的划词翻译、弹窗翻译、整页翻译、PDF 等交互与页面处理能力，主要重做联网、密钥边界与可选的固定术语覆盖。
 
 ## 数据流与隐私
 
-翻译请求直接发送到 SiliconFlow：
+默认翻译请求发送到本机 `http://127.0.0.1:11434/api/generate`，使用已安装的 `kaelri/hy-mt2:1.8b`。无需 API Key，也不会在本地失败时自动转发云端。
+
+只有在弹窗或设置中手动选择“硅基流动（云端）”时，待翻译文字才直接发送到 SiliconFlow：
 
 - `https://api.siliconflow.cn/v1/chat/completions`
 
@@ -20,14 +22,26 @@ API Key 保存在 `chrome.storage.local` 的扩展本地存储中，不写入 `c
 
 ## 默认配置
 
-- Provider：SiliconFlow
-- 模型：`THUDM/GLM-4-9B-0414`
-- 目标语言：沿用浏览器 / 扩展原有语言设置
+- Provider：Ollama（本机）
+- 模型：`kaelri/hy-mt2:1.8b`
+- 源语言：自动识别；目标语言：简体中文；支持英语、日语划词
 - 页面翻译：仅译文
 - 自动术语注释：无
 - 固定术语表：开启，但默认内容为空
 
 SiliconFlow 内置 `THUDM/GLM-4-9B-0414`、`tencent/Hunyuan-MT-7B`、`Qwen/Qwen3.5-4B` 三个当前可选模型。模型免费状态由 Provider 决定，未来可能变化。
+
+首次升级到本地翻译版本会一次性切换到本地模型和简体中文，并关闭“仅英语”与互译开关。保留已有密钥、术语和布局设置；之后的手动服务选择不会被覆盖。
+
+划词翻译会取所在段落附近最多 1200 字作为本地参考，只翻译选中文字。不会从输入框或可编辑区域额外读取上下文，参考段落不会发送到 SiliconFlow。专业术语的译法仍受模型能力影响，固定译法可写入术语表。
+
+本地请求让模型保留在内存中 30 分钟，以便连续划词；第一次加载可能较慢。本地整页翻译一次处理一批，云端保留原有调度。
+
+### Ollama 与 Chrome 连接
+
+保持 Ollama 运行，并用 `ollama list` 确认模型已安装。Ollama 默认会拒绝扩展来源的 POST 请求；Windows 下将用户环境变量 `OLLAMA_ORIGINS` 设为 `chrome-extension://你的扩展ID`，随后完全退出并重新启动 Ollama。扩展 ID 见 `chrome://extensions/` 的详情页。保持默认的本机监听地址，无需开放局域网端口。
+
+参考：[Ollama API](https://docs.ollama.com/api/generate)、[扩展来源配置](https://docs.ollama.com/faq#how-can-i-allow-additional-web-origins-to-access-ollama)。
 
 也可以启用“自定义模型”，手动填写 SiliconFlow 支持的模型 ID。
 
@@ -61,7 +75,7 @@ OpenAI = OpenAI
 - 原文 / 译文 / 双语对照显示
 - PDF 翻译
 - 页面与域名黑名单
-- SiliconFlow 直连
+- Ollama 本地翻译，SiliconFlow 手动直连备用
 - 模型可在弹窗直接切换
 - API Key 本机保存
 - 可选用户固定术语表
@@ -75,7 +89,7 @@ OpenAI = OpenAI
 3. 开启“开发者模式”。
 4. 点击“加载已解压的扩展程序”。
 5. 选择构建生成的 Chrome 扩展目录。
-6. 打开扩展设置并填写 SiliconFlow API Key。
+6. 保持 Ollama 运行，并允许该扩展来源。仅使用云端备用时需要填写 SiliconFlow API Key。
 
 ### Firefox
 
@@ -83,7 +97,7 @@ OpenAI = OpenAI
 2. 打开 `about:debugging#/runtime/this-firefox`。
 3. 点击“临时载入附加组件”。
 4. 选择 Firefox 构建目录中的 manifest。
-5. 打开扩展设置并填写 SiliconFlow API Key。
+5. 保持 Ollama 运行，并配置对应的 `moz-extension://` 来源。仅使用云端备用时需要填写 SiliconFlow API Key。
 
 ## 开发
 
@@ -120,3 +134,4 @@ npm run build:firefox
 - `LICENSE.NPL`
 
 仓库内 PDF.js、字体等第三方资源还包含其各自许可证文件。
+

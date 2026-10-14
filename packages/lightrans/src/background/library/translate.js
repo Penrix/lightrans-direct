@@ -38,7 +38,8 @@ class TranslatorManager {
             this.DEFAULT_TRANSLATOR = "AITrans";
 
             // 服务模式与自定义模型相关状态
-            this.SERVICE_MODE = configs.TranslationService || "free";
+            this.SERVICE_MODE = configs.TranslationService || "ollama";
+            this.AI_TRANSLATOR.setProvider(this.SERVICE_MODE);
             this.CUSTOM_MODEL = !!configs.CustomModel;
             this.CUSTOM_MODEL_NAME = configs.CustomModelName || "";
             this.AI_MODEL = configs.AIModel;
@@ -46,7 +47,7 @@ class TranslatorManager {
             // 计算有效模型：自定义模式且勾选了自定义模型时，使用用户手填的模型名。
             // 兜底：免费模式或非自定义时若 AIModel 缺失，回退到预设模型首个，避免空模型被后续 setCurrentModel 静默 no-op。
             const fallbackModel = this.AI_TRANSLATOR.getAvailableModels()[0];
-            const effectiveModel = (this.SERVICE_MODE === "custom" && this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
+            const effectiveModel = (this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
                 ? this.CUSTOM_MODEL_NAME
                 : (this.AI_MODEL || fallbackModel);
 
@@ -118,7 +119,7 @@ class TranslatorManager {
         this.channel.provide("translate", async (params) => {
             // Ensure that configurations have been initialized.
             await this.config_loader;
-            return this.translate(params.text, params.position);
+            return this.translate(params.text, params.position, params.selectionHeight, params.context);
         });
 
         // Get available AI models service.
@@ -162,7 +163,7 @@ class TranslatorManager {
                     }
 
                     if (changes["TranslationService"]) {
-                        this.SERVICE_MODE = changes["TranslationService"].newValue || "free";
+                        this.SERVICE_MODE = changes["TranslationService"].newValue || "ollama";
                         // Update the translation service mode for the translator.
                         this.AI_TRANSLATOR.setServiceMode(this.SERVICE_MODE);
                     }
@@ -183,7 +184,7 @@ class TranslatorManager {
                     // 任一影响有效模型的因素变化，重新计算并设置
                     if (changes["AIModel"] || changes["TranslationService"] || changes["CustomModel"] || changes["CustomModelName"]) {
                         const fallbackModel = this.AI_TRANSLATOR.getAvailableModels()[0];
-                        const effectiveModel = (this.SERVICE_MODE === "custom" && this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
+                        const effectiveModel = (this.CUSTOM_MODEL && this.CUSTOM_MODEL_NAME)
                             ? this.CUSTOM_MODEL_NAME
                             : (this.AI_MODEL || fallbackModel);
                         this.AI_TRANSLATOR.setCurrentModel(effectiveModel);
@@ -279,7 +280,7 @@ class TranslatorManager {
      *
      * @returns {Promise<void>} translate finished Promise
      */
-    async translate(text, position, selectionHeight = 0) {
+    async translate(text, position, selectionHeight = 0, context = "") {
         // Ensure that configurations have been initialized.
         await this.config_loader;
 
@@ -339,7 +340,7 @@ class TranslatorManager {
 
             console.log('Final translation languages - sl:', sl, 'tl:', tl);
             // Do translate.
-            let result = await this.AI_TRANSLATOR.translate(text, sl, tl);
+            let result = await this.AI_TRANSLATOR.translate(text, sl, tl, context);
             result.sourceLanguage = sl;
             result.targetLanguage = tl;
 
@@ -512,7 +513,7 @@ function translatePage(channel, model) {
         
         // 使用 chrome.scripting.executeScript 注入脚本（MV3 已移除 chrome.tabs.executeScript）
         // 把原内联脚本重构成可序列化的函数，通过 args 传入 pageMode 与 model
-        const injectPageTranslate = (pageMode, model) => {
+        const injectPageTranslate = (pageMode, model, localProvider) => {
             console.log('lightrans: Page translate script injected');
 
             // 页面翻译显示模式：original(原文) / translated(译文) / bilingual(对照)
@@ -595,8 +596,8 @@ function translatePage(channel, model) {
                     // 自适应并发：初始 / 上限 / 下限。初始保守起步（免费中继共享配额，
                     // 瞬时 8 并发批量易打满 TPM，上游限流会被中继透传成 502），
                     // 持续成功后自动爬升到上限；配额升级后可适当调高初始值。
-                    const INITIAL_PARALLEL = 4;
-                    const MAX_PARALLEL = 10;
+                    const INITIAL_PARALLEL = localProvider ? 1 : 4;
+                    const MAX_PARALLEL = localProvider ? 1 : 10;
                     const MIN_PARALLEL = 1;
                     // 连续成功多少个批次后并发 +1（恢复探测）
                     const SUCCESS_STREAK_TO_RECOVER = 15;
@@ -917,7 +918,7 @@ function translatePage(channel, model) {
             };
 
             chrome.scripting.executeScript(
-                { target: { tabId }, func: injectPageTranslate, args: [pageModeParam, modelParam] },
+                { target: { tabId }, func: injectPageTranslate, args: [pageModeParam, modelParam, allSettings.TranslationService === "ollama"] },
                 (result) => {
             if (chrome.runtime.lastError) {
                 log(`Chrome runtime error: ${chrome.runtime.lastError}`);
@@ -935,3 +936,4 @@ function translatePage(channel, model) {
 }
 
 export { TranslatorManager, translatePage };
+

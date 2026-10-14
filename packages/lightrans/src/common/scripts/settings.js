@@ -1,5 +1,3 @@
-import { BROWSER_LANGUAGES_MAP } from "common/scripts/languages.js";
-
 /**
  * Settings that are safe to sync between browsers.
  * Provider API keys are intentionally excluded and live in chrome.storage.local.
@@ -15,13 +13,11 @@ const DEFAULT_SETTINGS = {
         FoldLongContent: true,
         SelectTranslatePosition: "TopRight",
     },
-    languageSetting: { sl: "auto", tl: BROWSER_LANGUAGES_MAP[chrome.i18n.getUILanguage()] },
+    languageSetting: { sl: "auto", tl: "zh-CN" },
     OtherSettings: {
-        // Lightrans Direct defaults to the user's main use case: English input only,
-        // always translated to Simplified Chinese. MutualTranslate is retained as
-        // the legacy fallback when this switch is disabled.
-        EnglishToSimplifiedChineseOnly: true,
-        MutualTranslate: true,
+        // English and Japanese selections both translate to Simplified Chinese.
+        EnglishToSimplifiedChineseOnly: false,
+        MutualTranslate: false,
         SelectTranslate: true,
         TranslateAfterDblClick: false,
         TranslateAfterSelect: false,
@@ -30,10 +26,8 @@ const DEFAULT_SETTINGS = {
     },
     DefaultTranslator: "AITrans",
     DefaultPageTranslator: "AITrans",
-    // Kept for compatibility with the upstream settings shape. Lightrans Direct
-    // intentionally supports only direct SiliconFlow requests now.
-    TranslationService: "siliconflow",
-    AIModel: "THUDM/GLM-4-9B-0414",
+    TranslationService: "ollama",
+    AIModel: "kaelri/hy-mt2:1.8b",
     PageTranslationDisplayMode: "translated",
     CustomModel: false,
     CustomModelName: "",
@@ -100,7 +94,19 @@ function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
         const storageKeys = requested.filter((key) => key !== "ApiKey");
         if (wantsLegacyApiKey) storageKeys.push("ApiKey");
 
-        chrome.storage.sync.get(storageKeys, async (stored) => {
+        chrome.storage.sync.get([...new Set([...storageKeys, "LocalTranslationVersion", "TranslationService", "AIModel", "OtherSettings", "languageSetting"])], async (stored) => {
+            // Migrate once so an explicit later cloud choice is never overwritten.
+            let updated = false;
+            if (stored.LocalTranslationVersion !== 1) {
+                stored.LocalTranslationVersion = 1;
+                stored.TranslationService = "ollama";
+                stored.AIModel = "kaelri/hy-mt2:1.8b";
+                stored.CustomModel = false;
+                stored.OtherSettings = { ...DEFAULT_SETTINGS.OtherSettings, ...stored.OtherSettings,
+                    EnglishToSimplifiedChineseOnly: false, MutualTranslate: false };
+                stored.languageSetting = { sl: "auto", tl: "zh-CN" };
+                updated = true;
+            }
             const legacyApiKey = (stored.ApiKey || "").trim();
             delete stored.ApiKey;
 
@@ -112,7 +118,6 @@ function getOrSetDefaultSettings(settings, defaults = DEFAULT_SETTINGS) {
                 await new Promise((done) => chrome.storage.sync.remove(["ApiKey"], done));
             }
 
-            let updated = false;
             for (const setting of requested) {
                 if (setting === "ApiKey") continue;
                 if (stored[setting] === undefined) {

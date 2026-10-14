@@ -133,10 +133,10 @@ function unchangedTranslationResult(text) {
  * not spend an API request, so this gate is cheap and deterministic.
  */
 const translateSelectionNormally = TRANSLATOR_MANAGER.translate.bind(TRANSLATOR_MANAGER);
-TRANSLATOR_MANAGER.translate = async function (text, position, selectionHeight = 0) {
+TRANSLATOR_MANAGER.translate = async function (text, position, selectionHeight = 0, context = "") {
     await this.config_loader;
     if (!this.OTHER_SETTINGS?.EnglishToSimplifiedChineseOnly) {
-        return translateSelectionNormally(text, position, selectionHeight);
+        return translateSelectionNormally(text, position, selectionHeight, context);
     }
 
     const detected = await this.AI_TRANSLATOR.detect(text);
@@ -156,7 +156,7 @@ TRANSLATOR_MANAGER.translate = async function (text, position, selectionHeight =
     });
 
     try {
-        const result = await this.AI_TRANSLATOR.translate(text, "en", "zh-CN");
+        const result = await this.AI_TRANSLATOR.translate(text, "en", "zh-CN", context);
         result.sourceLanguage = "en";
         result.targetLanguage = "zh-CN";
         this.channel.emitToTabs(currentTabId, "translating_finished", {
@@ -192,9 +192,9 @@ TRANSLATOR_MANAGER.translate = async function (text, position, selectionHeight =
 TRANSLATOR_MANAGER.config_loader.then(() => {
     const translator = TRANSLATOR_MANAGER.AI_TRANSLATOR;
     const translateNormally = translator.translate.bind(translator);
-    translator.translate = async (text, from, to) => {
+    translator.translate = async (text, from, to, context = "") => {
         if (!englishToSimplifiedChineseOnly()) {
-            return translateNormally(text, from, to);
+            return translateNormally(text, from, to, context);
         }
 
         let detected = from;
@@ -204,7 +204,7 @@ TRANSLATOR_MANAGER.config_loader.then(() => {
         if (!isEnglishLanguage(detected)) {
             return unchangedTranslationResult(text);
         }
-        return translateNormally(text, "en", "zh-CN");
+        return translateNormally(text, "en", "zh-CN", context);
     };
 });
 
@@ -241,9 +241,9 @@ try {
                             if (channel && tab && tab.id) {
                                 channel
                                     .requestToTab(tab.id, "get_selection")
-                                    .then(({ text, position, selectionHeight }) => {
+                                    .then(({ text, position, selectionHeight, context }) => {
                                         if (text) {
-                                            return TRANSLATOR_MANAGER.translate(text, position, selectionHeight);
+                                            return TRANSLATOR_MANAGER.translate(text, position, selectionHeight, context);
                                         }
                                         return Promise.reject();
                                     })
@@ -426,3 +426,4 @@ if (BUILD_ENV === "development" && BROWSER_ENV === "chrome") {
         module.hotReload();
     });
 }
+

@@ -26,10 +26,12 @@ class AITranslator {
         "Obsidian = Obsidian（笔记与知识管理软件）";
 
     private apiKey = "";
-    private currentModel = "THUDM/GLM-4-9B-0414";
+    private provider = "ollama";
+    private currentModel = "kaelri/hy-mt2:1.8b";
 
     async detect(text: string): Promise<string> {
         const value = text || "";
+        if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value)) return "ja";
         const hanCount = (value.match(/\p{Script=Han}/gu) || []).length;
         const latinCount = (value.match(/\p{Script=Latin}/gu) || []).length;
 
@@ -50,7 +52,7 @@ class AITranslator {
     }
 
     /**
-     * Translate directly through SiliconFlow.
+     * Translate through the explicitly selected local or cloud provider.
      *
      * "auto" is resolved locally whenever the script balance is clear, so the model
      * normally receives an explicit language pair such as en -> zh-CN. This keeps
@@ -64,14 +66,16 @@ class AITranslator {
         to: string,
         text: string,
         maxTokens: number,
-        batch = false
+        batch = false,
+        context = ""
     ): Promise<string> {
-        const apiKey = await this.resolveApiKey();
-        if (!apiKey) {
+        const provider = this.provider;
+        const model = this.getSafeModel();
+        const apiKey = provider === "siliconflow" ? await this.resolveApiKey() : "";
+        if (provider === "siliconflow" && !apiKey) {
             throw new Error("请先填写 SiliconFlow API Key");
         }
 
-        const model = this.getSafeModel();
         const resolvedFrom = await this.resolveSourceLanguage(from, text);
         const sourceLabel = resolvedFrom === "auto" ? "the source language" : resolvedFrom;
         const preferences = await this.resolveTranslationPreferences();
@@ -88,10 +92,13 @@ class AITranslator {
             : `Translate the text from ${sourceLabel} to ${to}. Preserve meaning, tone and formatting. Return only the translation.${glossaryInstruction}`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), AITranslator.REQUEST_TIMEOUT_MS);
+        const timeoutMs = provider === "ollama" ? 60000 : AITranslator.REQUEST_TIMEOUT_MS;
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
-            const translated = await this.requestSiliconFlow(
+            const translated = provider === "ollama"
+                ? await this.requestOllama(model, to, protectedText.text, maxTokens, batch, context, glossaryInstruction, controller.signal)
+                : await this.requestSiliconFlow(
                 model,
                 apiKey,
                 systemPrompt,
@@ -108,14 +115,44 @@ class AITranslator {
             const candidate = error as { name?: string; message?: string };
             if (candidate?.name === "AbortError") {
                 throw new Error(
-                    `SiliconFlow 请求超时（${AITranslator.REQUEST_TIMEOUT_MS / 1000} 秒）。` +
-                    "请切换其它模型或检查当前网络/代理。"
+                    `${provider === "ollama" ? "Ollama 本地模型" : "SiliconFlow"} 请求超时（${timeoutMs / 1000} 秒）。` +
+                    (provider === "ollama" ? "请确认 Ollama 正在运行，或缩短待翻译文本。" : "请切换其它模型或检查当前网络/代理。")
                 );
+            }
+            if (provider === "ollama" && candidate?.name === "TypeError") {
+                throw new Error("无法连接 Ollama 本地翻译服务，请启动 Ollama 后再试。不会自动切换到云端。");
             }
             throw error;
         } finally {
             clearTimeout(timeoutId);
         }
+    }
+
+    private async requestOllama(
+        model: string, to: string, text: string, maxTokens: number,
+        batch: boolean, context: string, glossaryInstruction: string, signal: AbortSignal
+    ): Promise<string> {
+        const target = ({ "zh-CN": "简体中文", "zh-TW": "繁体中文", en: "英语", ja: "日语" } as Record<string, string>)[to] || to;
+        const instruction = batch
+            ? `将以下各段翻译为${target}。保留每个 <N> 编号，只输出带编号的译文，不要额外解释：`
+            : context
+                ? `${context.slice(0, 1200)}\n参考上面的信息，把下面的文本翻译成${target}，注意不需要翻译上文，也不要额外解释：`
+                : `将以下文本翻译为${target}，注意只需要输出翻译后的结果，不要额外解释：`;
+        const response = await fetch("http://127.0.0.1:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model, prompt: `${instruction}${glossaryInstruction}\n\n${text}`,
+                stream: false, keep_alive: "30m",
+                options: { num_ctx: 4096, num_predict: maxTokens },
+            }),
+            signal,
+        });
+        const data = await AITranslator.readJsonResponse(response, "Ollama");
+        if (data.done_reason === "length") throw new Error("Ollama 译文超出长度限制，请缩短待翻译文本。");
+        const translated = (data.response || "").toString().trim();
+        if (!translated) throw new Error("Ollama 返回了空译文");
+        return translated;
     }
 
     private async requestSiliconFlow(
@@ -329,9 +366,9 @@ class AITranslator {
         return restored;
     }
 
-    async translate(text: string, from: string, to: string): Promise<TranslationResult> {
+    async translate(text: string, from: string, to: string, context = ""): Promise<TranslationResult> {
         try {
-            const translatedText = await this.requestTranslate(from, to, text, 1024);
+            const translatedText = await this.requestTranslate(from, to, text, AITranslator.estimateMaxTokens(text.length), false, context);
             return {
                 originalText: text,
                 mainMeaning: translatedText,
@@ -462,28 +499,32 @@ class AITranslator {
 
     private getSafeModel(): string {
         const model = (this.currentModel || "").trim();
-        return model || AITranslator.MODELS[0];
+        return model || this.getDefaultModel();
     }
 
-    getAvailableModels(_provider?: string): string[] {
-        return [...AITranslator.MODELS];
+    getAvailableModels(provider = this.provider): string[] {
+        return provider === "ollama" ? ["kaelri/hy-mt2:1.8b"] : [...AITranslator.MODELS];
     }
 
-    getDefaultModel(_provider?: string): string {
-        return AITranslator.MODELS[0];
+    getDefaultModel(provider = this.provider): string {
+        return this.getAvailableModels(provider)[0];
     }
 
-    setProvider(_provider: string): void {
-        // Compatibility shim: Lightrans Direct now intentionally uses SiliconFlow only.
+    setProvider(provider: string): void {
+        const next = provider === "siliconflow" ? "siliconflow" : "ollama";
+        if (this.provider !== next) {
+            this.provider = next;
+            this.currentModel = this.getDefaultModel();
+        }
     }
 
     getProvider(): string {
-        return "siliconflow";
+        return this.provider;
     }
 
     /** Compatibility shim for upstream Lightrans' manager. */
-    setServiceMode(_mode: string): void {
-        // SiliconFlow is the only supported direct provider.
+    setServiceMode(mode: string): void {
+        this.setProvider(mode);
     }
 
     setApiKey(key: string): void {
