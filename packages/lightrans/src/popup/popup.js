@@ -1,13 +1,9 @@
-import { LANGUAGES } from "@lightrans/translators";
+import { LANGUAGES, AITranslator } from "@lightrans/translators";
 import Channel from "common/scripts/channel.js";
 import { i18nHTML } from "common/scripts/common.js";
 import { DEFAULT_SETTINGS, getOrSetDefaultSettings } from "common/scripts/settings.js";
 
-const MODELS = [
-    "THUDM/GLM-4-9B-0414",
-    "tencent/Hunyuan-MT-7B",
-    "Qwen/Qwen3.5-4B",
-];
+const translatorConfig = new AITranslator();
 
 const channel = new Channel();
 
@@ -15,6 +11,7 @@ let sourceLanguage = document.getElementById("sl");
 let targetLanguage = document.getElementById("tl");
 let exchangeButton = document.getElementById("exchange");
 let modelSelect = document.getElementById("model");
+let providerSelect = document.getElementById("provider");
 let modelSettingsPending = Promise.resolve();
 
 window.onload = async function () {
@@ -52,11 +49,13 @@ window.onload = async function () {
         );
     }
 
+    providerSelect.value = settings.TranslationService;
     populateModels(settings.AIModel);
     modelSelect.onchange = () => saveModel(modelSelect.value);
-
-    // Normalize old installs that had Gemini selected.
-    chrome.storage.sync.set({ TranslationService: "siliconflow" });
+    providerSelect.onchange = () => {
+        populateModels(translatorConfig.getDefaultModel(providerSelect.value));
+        saveModel(modelSelect.value);
+    };
 
     showSourceTarget();
     judgeValue(exchangeButton, sourceLanguage);
@@ -68,6 +67,8 @@ function getSyncStorage(keys) {
 }
 
 function populateModels(selectedModel) {
+    const MODELS = translatorConfig.getAvailableModels(providerSelect.value);
+    if (selectedModel && !MODELS.includes(selectedModel)) MODELS.push(selectedModel);
     modelSelect.innerHTML = "";
     for (const model of MODELS) {
         modelSelect.options.add(new Option(model, model));
@@ -79,7 +80,7 @@ function saveModel(model) {
     modelSettingsPending = new Promise((resolve) => {
         chrome.storage.sync.set(
             {
-                TranslationService: "siliconflow",
+                TranslationService: providerSelect.value,
                 AIModel: model,
                 CustomModel: false,
             },
@@ -112,6 +113,7 @@ function addEventListener() {
 }
 
 function friendlyTranslateError(message) {
+    if (/Ollama/i.test(message)) return `本地翻译失败：${message}`;
     if (/SiliconFlow.*\b402\b|status code 402/i.test(message)) {
         return "SiliconFlow 返回 402：账户状态阻止 API 调用。请检查余额/欠费状态。";
     }
@@ -183,7 +185,7 @@ async function translateSubmit() {
         } else if (result && result.mainMeaning) {
             resultDiv.textContent = result.mainMeaning;
         } else {
-            resultDiv.textContent = "翻译失败：SiliconFlow 未返回译文。";
+            resultDiv.textContent = "翻译失败：未返回译文。";
         }
     } catch (error) {
         resultDiv.textContent = friendlyTranslateError(String((error && error.message) || error));
@@ -216,3 +218,4 @@ function showSourceTarget() {
     const targetLanguageString = targetLanguage.options[targetLanguage.selectedIndex].text;
     inputElement.placeholder = `${sourceLanguageString} ==> ${targetLanguageString}`;
 }
+

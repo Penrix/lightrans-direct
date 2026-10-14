@@ -1,4 +1,5 @@
 import { i18nHTML } from "common/scripts/common.js";
+import { AITranslator } from "@lightrans/translators";
 import {
     DEFAULT_SETTINGS,
     getOrSetDefaultSettings,
@@ -6,11 +7,7 @@ import {
     setProviderSecret,
 } from "common/scripts/settings.js";
 
-const MODELS = [
-    "THUDM/GLM-4-9B-0414",
-    "tencent/Hunyuan-MT-7B",
-    "Qwen/Qwen3.5-4B",
-];
+const translatorConfig = new AITranslator();
 
 window.onload = async () => {
     i18nHTML();
@@ -22,6 +19,7 @@ window.onload = async () => {
     const customModelCheckbox = document.getElementById("custom-model");
     const aiModelSelect = document.getElementById("ai-model");
     const aiModelInput = document.getElementById("ai-model-input");
+    const providerSelect = document.getElementById("provider");
     const glossaryText = document.getElementById("glossary-text");
     const glossaryStatus = document.getElementById("glossary-status");
     const englishOnlyCheckbox = document.getElementById("english-to-zh-only");
@@ -29,6 +27,8 @@ window.onload = async () => {
     const mutualTranslateColumn = document.getElementById("mutual-translate-column");
 
     function populateModels(selectedModel) {
+        const MODELS = translatorConfig.getAvailableModels(settings.TranslationService);
+        if (selectedModel && !MODELS.includes(selectedModel)) MODELS.push(selectedModel);
         if (!aiModelSelect) return;
         aiModelSelect.innerHTML = "";
         for (const model of MODELS) {
@@ -182,9 +182,23 @@ window.onload = async () => {
         });
     }
 
-    // Provider selection was intentionally removed. Normalize old installs immediately.
-    settings.TranslationService = "siliconflow";
-    chrome.storage.sync.set({ TranslationService: "siliconflow" });
+    function showProvider() {
+        const local = settings.TranslationService === "ollama";
+        document.getElementById("apikey-row").style.display = local ? "none" : "";
+        document.getElementById("ollama-hint").style.display = local ? "" : "none";
+        aiModelInput.placeholder = local ? "Ollama 中已安装的模型名称" : "SiliconFlow 模型 ID";
+    }
+    providerSelect.onchange = () => {
+        settings.TranslationService = providerSelect.value;
+        settings.AIModel = translatorConfig.getDefaultModel(providerSelect.value);
+        settings.CustomModel = false;
+        customModelCheckbox.checked = false;
+        populateModels(settings.AIModel);
+        chrome.storage.sync.set({ TranslationService: settings.TranslationService, AIModel: settings.AIModel, CustomModel: false });
+        showProvider();
+        syncCustomModelVisibility();
+    };
+    showProvider();
     syncCustomModelVisibility();
     syncTranslationDirectionControls();
 };
@@ -208,3 +222,4 @@ function saveOption(localSettings, settingItemPath, value) {
     result[settingItemPath[0]] = localSettings[settingItemPath[0]];
     chrome.storage.sync.set(result);
 }
+
